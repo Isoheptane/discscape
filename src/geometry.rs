@@ -16,11 +16,13 @@ impl SpiralGeometry {
     pub fn outer_radius_mm(&self) -> f64 {
         self.r0 + (self.n * self.p / 1000.0)
     }
+    #[inline]
     pub fn polar_at_pos(&self, pos: f64) -> Option<PolarCoord> {
-        let p_mm = self.p / 1000.0;
+        let p_mm = self.p * 0.001;
+
         let total_length = TAU * self.n * (self.r0 + p_mm * self.n / 2.0);
         let length = total_length * pos;
-
+        
         let b = TAU * self.r0;
         let a = PI * p_mm;
         let rev = 2.0 * length / (b + (b * b + 4.0 * a * length).sqrt());
@@ -60,6 +62,7 @@ pub struct PhaseCalibration {
 }
 
 impl PhaseCalibration {
+    #[inline]
     pub fn correction_rad(&self, radius_mm: f64) -> f64 {
         let samples = &self.samples;
         if samples.is_empty() {
@@ -89,6 +92,7 @@ pub struct CalibratedSpiralGeometry {
 }
 
 impl CalibratedSpiralGeometry {
+    #[inline]
     pub fn polar_at_pos(&self, pos: f64) -> Option<PolarCoord> {
         let (r, theta) = self.geometry.polar_at_pos(pos)?;
 

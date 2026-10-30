@@ -4,7 +4,7 @@ HP PLDS DS-8ACSH @ 10x
 
 Geometry:
 
-let geometry SpiralGeometry {
+let geometry = SpiralGeometry {
     r0: 25.0,
     p: 1.510410490,
     n: 22110.093216189,
