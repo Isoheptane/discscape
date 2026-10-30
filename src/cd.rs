@@ -1,9 +1,19 @@
+use image::GrayImage;
+use rand::{RngExt, rngs::SmallRng};
+
 use crate::geometry::{CalibratedSpiralGeometry, PhaseCalibration, PolarCoord, SpiralGeometry};
 
-pub const BYTES_PER_F1: u64 = 24;
-pub const BYTES_PER_SECTOR: u64 = 2352;
-pub const FRAMES_PER_SECTOR: u64 = BYTES_PER_SECTOR / BYTES_PER_F1;
+pub const AUDIO_CHUNK_SIZE: usize = 2352;
+pub const MODE1_2048_CHUNK_SIZE: usize = 2048;
+pub const MODE1_2352_CHUNK_SIZE: usize = 2352;
+pub const MODE2_2336_CHUNK_SIZE: usize = 2336;
+
+pub const F1_SIZE_BYTES: u64 = 24;
+pub const SECTOR_SIZE_BYTES: u64 = 2352;
+pub const FRAMES_PER_SECTOR: u64 = SECTOR_SIZE_BYTES / F1_SIZE_BYTES;
 pub const CHANNEL_BITS_PER_FRAME: u64 = 588;
+pub const SYNC_SIZE_BYTES: u64 = 12;
+pub const SCRAMBLE_LUT_SIZE_BYTES: usize = (SECTOR_SIZE_BYTES - SYNC_SIZE_BYTES) as usize;
 
 pub type FramePosition = (i64, u8);
 
@@ -51,15 +61,15 @@ pub fn f3_to_f1(pos: FramePosition) -> Option<FramePosition> {
 }
 
 pub fn be_bin_to_f3(idx: u64) -> Option<FramePosition> {
-    let frame = (idx / BYTES_PER_F1) as i64;
-    let byte = (idx % BYTES_PER_F1) as u8;
+    let frame = (idx / F1_SIZE_BYTES) as i64;
+    let byte = (idx % F1_SIZE_BYTES) as u8;
 
     f1_to_f3((frame, byte))
 }
 #[allow(unused)]
 pub fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
-    let frame = (idx / BYTES_PER_F1) as i64;
-    let byte = ((idx % BYTES_PER_F1) as u8) ^ 1;
+    let frame = (idx / F1_SIZE_BYTES) as i64;
+    let byte = ((idx % F1_SIZE_BYTES) as u8) ^ 1;
 
     f1_to_f3((frame, byte))
 }
@@ -67,14 +77,14 @@ pub fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
 pub fn f3_to_be_bin(pos: FramePosition) -> Option<u64> {
     let (frame, byte) = f3_to_f1(pos)?;
     u64::try_from(frame).ok()?
-        .checked_mul(BYTES_PER_F1)?
+        .checked_mul(F1_SIZE_BYTES)?
         .checked_add(byte as u64)
 }
 #[allow(unused)]
 pub fn f3_to_le_bin(pos: FramePosition) -> Option<u64> {
     let (frame, byte) = f3_to_f1(pos)?;
     u64::try_from(frame).ok()?
-        .checked_mul(BYTES_PER_F1)?
+        .checked_mul(F1_SIZE_BYTES)?
         .checked_add((byte ^ 1) as u64)
 }
 #[allow(unused)]
@@ -105,7 +115,7 @@ impl CdDisc {
         dtr: f64,
         sectors: u64
     ) -> Self {
-        let capacity = sectors as f64 * 2352.0;
+        let capacity = sectors as f64 * SECTOR_SIZE_BYTES as f64;
         // tr0 is the averave byte count of first revolution, eff_tr0 have an offset of half revolutions
         let eff_tr0 = tr0 - dtr / 2.0;
         let p = 1000.0 * r0 * dtr / eff_tr0;
@@ -146,4 +156,152 @@ impl CdDisc {
     pub fn le_bin_to_polar_coord(&self, index: u64) -> Option<PolarCoord> {
         self.f3_to_polar_coord(le_bin_to_f3(index)?)
     }
+}
+
+const fn generate_scramble_table() -> [u8; SCRAMBLE_LUT_SIZE_BYTES] {
+    let mut table = [0u8; SCRAMBLE_LUT_SIZE_BYTES];
+    let mut lfsr: u32 = 0x0001;
+    let mut i = 0;
+
+    while i < SCRAMBLE_LUT_SIZE_BYTES {
+        table[i as usize] = (lfsr & 0xFF) as u8;
+        let feedback = (lfsr ^ (lfsr >> 1)) & 0xFF;
+        lfsr = (feedback << 7 ^ (lfsr >> 8)) & 0x7FFF;
+        i +=1;
+    }
+    table
+}
+
+pub static SCRAMBLE_TABLE: [u8; SCRAMBLE_LUT_SIZE_BYTES] = generate_scramble_table();
+
+#[inline]
+fn u8_to_bcd(val: u8) -> u8 {
+    let tens = val / 10;
+    let units = val % 10;
+    (tens << 4) | units
+}
+
+#[inline]
+fn sample_image_luma(
+    disc: &CdDisc,
+    image: &GrayImage,
+    byte_idx: u64,
+    cdrom: bool
+) -> u8 {
+    let (r, theta) = if cdrom {
+        disc.le_bin_to_polar_coord(byte_idx).expect("Invalid CD-ROM byte index for polar mapping")
+    } else {
+        disc.be_bin_to_polar_coord(byte_idx).expect("Invalid audio byte index for polar mapping")
+    };
+    let (sin_theta, cos_theta) = theta.sin_cos();
+    let x = cos_theta * r;
+    let y = sin_theta * r;
+    let x = (x + 60.0) / 120.0 * image.width() as f64;
+    let y = (y + 60.0) / 120.0 * image.height() as f64;
+    let x = (x.round() as i32).clamp(0, image.width() as i32 - 1) as u32;
+    let y = (y.round() as i32).clamp(0, image.height() as i32 - 1) as u32;
+    
+    image.get_pixel(x, y).0[0]
+}
+
+/// Generates a full audio sector
+#[allow(unused)]
+pub fn generate_audio_chunk(
+    disc: &CdDisc,
+    image: &GrayImage,
+    rng: &mut SmallRng,
+    sector_num: usize,
+) -> [u8; AUDIO_CHUNK_SIZE] {
+    let mut chunk = [0; AUDIO_CHUNK_SIZE];
+
+    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    for i in 0..AUDIO_CHUNK_SIZE {
+        let luma = sample_image_luma(disc, image, sector_base + i as u64, false);
+        if rng.random_ratio(luma as u32, 255) {
+            chunk[i] = 0xAA;
+        } else {
+            chunk[i] = 0x20;
+        }
+    }
+
+    chunk
+}
+
+/// Generates a RAW MODE1/2352 chunk, but L-EC information is filled with image data
+#[allow(unused)]
+pub fn generate_mode1_2352_chunk(
+    disc: &CdDisc,
+    image: &GrayImage,
+    rng: &mut SmallRng,
+    sector_num: usize,
+) -> [u8; MODE1_2352_CHUNK_SIZE] {
+    let mut chunk = [0; MODE1_2352_CHUNK_SIZE];
+
+    let msf = sector_num + 150;
+    let sec = msf / 75;
+    let min = sec / 60;
+
+    chunk[0..12].copy_from_slice(&[0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00]);
+    chunk[12] = u8_to_bcd(min as u8);
+    chunk[13] = u8_to_bcd((sec % 60) as u8);
+    chunk[14] = u8_to_bcd((msf % 75) as u8);
+    chunk[15] = 0x01;
+
+    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    for i in 16..MODE1_2352_CHUNK_SIZE {
+        let luma = sample_image_luma(disc, image, sector_base + i as u64, true);
+        if rng.random_ratio(luma as u32, 255) {
+            chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i - 12];
+        } else {
+            chunk[i] = 0x20 ^ SCRAMBLE_TABLE[i - 12];
+        }
+    }
+
+    chunk
+}
+
+/// Generates a RAW MODE1/2048 chunk
+#[allow(unused)]
+pub fn generate_mode1_2048_chunk(
+    disc: &CdDisc,
+    image: &GrayImage,
+    rng: &mut SmallRng,
+    sector_num: usize,
+) -> [u8; MODE1_2048_CHUNK_SIZE] {
+    let mut chunk = [0; MODE1_2048_CHUNK_SIZE];
+
+    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    for i in 0..MODE1_2048_CHUNK_SIZE {
+        let luma = sample_image_luma(disc, image, sector_base + i as u64 + 16, true);
+        if rng.random_ratio(luma as u32, 255) {
+            chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i + 4];
+        } else {
+            chunk[i] = 0x20 ^ SCRAMBLE_TABLE[i + 4];
+        }
+    }
+
+    chunk
+}
+
+/// Generates a RAW MODE2/2336 chunk
+#[allow(unused)]
+pub fn generate_mode2_2336_chunk(
+    disc: &CdDisc,
+    image: &GrayImage,
+    rng: &mut SmallRng,
+    sector_num: usize,
+) -> [u8; MODE2_2336_CHUNK_SIZE] {
+    let mut chunk = [0; MODE2_2336_CHUNK_SIZE];
+
+    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    for i in 0..MODE2_2336_CHUNK_SIZE {
+        let luma = sample_image_luma(disc, image, sector_base + i as u64 + 16, true);
+        if rng.random_ratio(luma as u32, 255) {
+            chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i + 4];
+        } else {
+            chunk[i] = 0x20 ^ SCRAMBLE_TABLE[i + 4];
+        }
+    }
+
+    chunk
 }

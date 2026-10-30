@@ -6,7 +6,6 @@ use std::io::{BufWriter, Write};
 
 use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
-use rand::RngExt;
 use rand::rngs::SmallRng;
 
 use crate::geometry::PhaseSample;
@@ -42,25 +41,23 @@ fn main() {
         capacity_sectors: 359_849,
     };
 
-    let spoke_image = ImageReader::open("salt_contrast.png")
+    let image = ImageReader::open("salt_contrast.png")
         .expect("Failed to open")
         .decode().expect("Failed to decode")
         .to_luma8();
-    let image_w = spoke_image.width();
-    let image_h = spoke_image.height();
 
-    let file = match File::create("salt.pcm") {
+    let file = match File::create("salt.bin") {
         Ok(f) => f,
         Err(e) => {
             panic!("Can't open file: {}", e)
         }
     };
+
+
     let mut writer = BufWriter::with_capacity(2352 * 75 * 100, file);
 
-    let mut rng: SmallRng = rand::make_rng();
-
-    let start_sector: usize = 11387;
-    let end_sector: usize = 359840;
+    let start_sector: usize = 10637;
+    let end_sector: usize = 359845;
     let sector_count: usize = end_sector - start_sector;
     let total_size: usize = sector_count * 2352;
 
@@ -68,38 +65,21 @@ fn main() {
     // println!("End Position: {:#?}", disc.geometry.polar_at_pos(1.0));
     // println!("End Radius: {:#?}", disc.geometry.geometry.outer_radius_mm());
 
-    let bar = ProgressBar::new(total_size as u64);
+    let mut rng: SmallRng = rand::make_rng();
 
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {bytes}/{total_bytes}")
+    let bar = ProgressBar::new(sector_count as u64);
+
+    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len}")
         .unwrap()
     );
+
     for sector in start_sector..end_sector {
-        let head = sector * 2352;
-        let mut chunk = [0u8; 2352];
 
-        for i in 0..2352 {
-            let (r, theta) = disc.be_bin_to_polar_coord((head + i) as u64).unwrap();
-            let (sin_theta, cos_theta) = theta.sin_cos();
-            let x = cos_theta * r;
-            let y = sin_theta * r;
-            let x = (x + 60.0) / 120.0 * image_w as f64;
-            let y = (y + 60.0) / 120.0 * image_h as f64;
-            let x = (x.round() as i32).clamp(0, image_w as i32 - 1) as u32;
-            let y = (y.round() as i32).clamp(0, image_h as i32 - 1) as u32;
-            let luma: u8 = spoke_image.get_pixel(x, y).0[0];
-        
-            if rng.random_ratio(luma as u32, 255) {
-                chunk[i] = 0xAA;
-            } else {
-                chunk[i] = 0x20;
-            }
-        }
+        let chunk = cd::generate_mode2_2336_chunk(&disc, &image, &mut rng, sector);
 
-        if let Err(e) = writer.write_all(&chunk) {
-            panic!("Failed to write to buffer: {}", e)
-        }
+        writer.write_all(&chunk).expect("Failed to write to writer");
 
-        bar.inc(2352);
+        bar.inc(1);
 
     }
     writer.flush().expect("Failed to flush buffer");
