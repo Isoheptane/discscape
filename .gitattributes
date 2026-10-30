@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+*.rs   text diff=rust
+*.py   text
+*.md   text
+*.csv  text
+*.cue  text
+*.toml text
+
+*.png  binary
+*.pcm  binary
+*.kra  binary

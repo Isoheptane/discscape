@@ -1,0 +1,16 @@
+/target
+
+# Generated images / burns: hundreds of megabytes, regenerate instead of committing
+*.pcm
+*.bin
+*.wav
+*.toc
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Editor and application backups
+*.png~
+*.kra
+.*-autosave.*
