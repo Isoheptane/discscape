@@ -6,7 +6,6 @@ rust-version = "1.88"
 description = "Renders image into visible patterns on the data side of a CD"
 license = "MIT"
 authors = ["Isoheptane"]
-readme = "README.md"
 
 [dependencies]
 image = "0.25.10"

@@ -157,7 +157,7 @@ impl CdDisc {
         let p = 1000.0 * r0 * dtr / eff_tr0;
         // Continuous equivalent revolution count
         let n = 2.0 * capacity / (eff_tr0 + (eff_tr0 * eff_tr0 + 2.0 * dtr * capacity).sqrt());
-        let geometry = SpiralGeometry::new(25.0, p, n);
+        let geometry = SpiralGeometry::new(r0, p, n);
         let calib_geometry = CalibratedSpiralGeometry { 
             geometry, 
             phase_correction: None

@@ -77,12 +77,12 @@ fn main() {
     let mut writer = BufWriter::with_capacity(1024 * 1024, file);
 
     let start_sector: usize = 0;
-    let end_sector: usize = 65536;
+    let end_sector: usize = 359845;
     let sector_count: usize = end_sector - start_sector;
 
-    println!("Start Position: {:#?}", disc.geometry().polar_at_pos(0.0));
-    println!("End Position: {:#?}", disc.geometry().polar_at_pos(1.0));
-    println!("End Radius: {:#?}", disc.geometry().geometry.outer_radius_mm());
+    // println!("Start Position: {:#?}", disc.geometry().polar_at_pos(0.0));
+    // println!("End Position: {:#?}", disc.geometry().polar_at_pos(1.0));
+    // println!("End Radius: {:#?}", disc.geometry().geometry.outer_radius_mm());
 
     let mut rng: SmallRng = rand::make_rng();
 
