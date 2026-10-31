@@ -1,26 +1,29 @@
+mod sin_table;
+mod picture;
 mod geometry;
 mod cd;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::time::Instant;
 
 use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::rngs::SmallRng;
 
-use crate::geometry::{PhaseCorrectionLut, PhaseCorrectionSamples, PhaseSample, SampleInterpolation};
-use crate::{cd::CdDisc, geometry::{CalibratedSpiralGeometry, PhaseCorrection, SpiralGeometry}};
+use crate::geometry::{PhaseCorrectionSamples, PhaseSample, SampleInterpolation};
+use crate::geometry::{CalibratedSpiralGeometry, PhaseCorrection, SpiralGeometry};
+use crate::cd::CdDisc;
+use crate::picture::{DiscPicture};
 
 
 
 
 fn main() {
 
-    let geometry = SpiralGeometry {
-        r0: 25.0,
-        p: 1.510410490,
-        n: 22110.093216189,
-    };
+    let start = Instant::now();
+
+    let geometry = SpiralGeometry::new(25.0, 1.510410490, 22110.093216189);
 
     let samples = vec![
         PhaseSample { radius_mm: 25.0, correction_deg: 0.0 },
@@ -53,17 +56,17 @@ fn main() {
         phase_correction: Some(lut)
     };
 
-    let disc = CdDisc {
-        geometry: calib_geometry,
-        capacity_sectors: 359_849,
-    };
+    
 
-    let image = ImageReader::open("spoke3.png")
+    let disc = CdDisc::new(calib_geometry, 359849);
+
+    let image = ImageReader::open("salt_contrast.png")
         .expect("Failed to open")
-        .decode().expect("Failed to decode")
-        .to_luma8();
+        .decode().expect("Failed to decode");
 
-    let file = match File::create("spoke3-2336.bin") {
+    let picture = DiscPicture::new(image);
+
+    let file = match File::create("salt-2336.bin") {
         Ok(f) => f,
         Err(e) => {
             panic!("Can't open file: {}", e)
@@ -71,28 +74,28 @@ fn main() {
     };
 
 
-    let mut writer = BufWriter::with_capacity(2352 * 75 * 100, file);
+    let mut writer = BufWriter::with_capacity(1024 * 1024, file);
 
     let start_sector: usize = 0;
-    let end_sector: usize = 359_845;
+    let end_sector: usize = 65536;
     let sector_count: usize = end_sector - start_sector;
-    let total_size: usize = sector_count * 2352;
 
-    // println!("Start Position: {:#?}", disc.geometry.polar_at_pos(0.0));
-    // println!("End Position: {:#?}", disc.geometry.polar_at_pos(1.0));
-    // println!("End Radius: {:#?}", disc.geometry.geometry.outer_radius_mm());
+    println!("Start Position: {:#?}", disc.geometry().polar_at_pos(0.0));
+    println!("End Position: {:#?}", disc.geometry().polar_at_pos(1.0));
+    println!("End Radius: {:#?}", disc.geometry().geometry.outer_radius_mm());
 
     let mut rng: SmallRng = rand::make_rng();
 
     let bar = ProgressBar::new(sector_count as u64);
 
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len}")
+    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos:>7}/{len} sectors")
         .unwrap()
+        .progress_chars("##.")
     );
 
     for sector in start_sector..end_sector {
 
-        let chunk = cd::generate_mode2_2336_chunk(&disc, &image, &mut rng, sector);
+        let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
 
         writer.write_all(&chunk).expect("Failed to write to writer");
 
@@ -101,6 +104,11 @@ fn main() {
     }
     writer.flush().expect("Failed to flush buffer");
     bar.finish();
+
+    let end = Instant::now();
+
+    let ms = end.duration_since(start).as_nanos();
+    println!("Job done in {:.3} seconds", ms as f64 / 1_000_000_000.0)
 
     // file.write_all(&bytes).expect("Failed to write.");
 }

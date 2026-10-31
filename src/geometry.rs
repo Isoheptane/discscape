@@ -1,53 +1,71 @@
-pub type PolarCoord = (f64, f64);
-
 use std::f64::consts::{PI, TAU};
+
+/// Polar coordination of (r, rev)
+pub type PolarCoord = (f64, f64);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpiralGeometry {
     /// Radius in milimeter
-    pub r0: f64,
+    r0: f64,
     /// Track pitch in micrometer
-    pub p: f64,
+    p: f64,
     /// Revolution numbers
-    pub n: f64
+    n: f64,
+
+    p_mm: f64,
+    total_length: f64,
 }
 
 impl SpiralGeometry {
+
+    pub fn new(r0_mm: f64, p_um: f64, rev: f64) -> Self {
+        let p_mm = p_um * 0.001;
+        let total_length = TAU * rev * (r0_mm + p_mm * rev / 2.0);
+        Self { r0: r0_mm, p: p_um, n: rev, p_mm, total_length }
+    }
+
+    #[inline] #[allow(unused)] pub fn r0_mm(&self) -> f64 { self.r0 }
+    #[inline] #[allow(unused)] pub fn pitch_um(&self) -> f64 { self.p }
+    #[inline] #[allow(unused)] pub fn pitch_mm(&self) -> f64 { self.p_mm }
+    #[inline] #[allow(unused)] pub fn revolutions(&self) -> f64 { self.n }
+    #[inline] #[allow(unused)] pub fn total_length(&self) -> f64 { self.total_length }
+
     #[allow(unused)]
     pub fn outer_radius_mm(&self) -> f64 {
         self.r0 + (self.n * self.p / 1000.0)
     }
-    #[inline]
-    pub fn polar_at_pos(&self, pos: f64) -> Option<PolarCoord> {
-        let p_mm = self.p * 0.001;
 
-        let total_length = TAU * self.n * (self.r0 + p_mm * self.n / 2.0);
-        let length = total_length * pos;
+    #[inline]
+    pub fn polar_at_pos(&self, pos: f64) -> PolarCoord {
+        let length = self.total_length * pos;
         
         let b = TAU * self.r0;
-        let a = PI * p_mm;
+        let a = PI * self.p_mm;
         let rev = 2.0 * length / (b + (b * b + 4.0 * a * length).sqrt());
 
-        let radius_mm = self.r0 + p_mm * rev;
+        let radius_mm = self.r0 + self.p_mm * rev;
         // let angle_rad = TAU * rev.rem_euclid(1.0);
 
-        Some((radius_mm, rev * TAU))
+        (radius_mm, rev)
     }
+
     #[allow(unused)]
     pub fn pos_at_radius(&self, radius: f64) -> f64 {
-        let p_mm = self.p / 1000.0;
-        let total_length = TAU * self.n * (self.r0 + p_mm * self.n / 2.0);
-        let rev = (radius - self.r0) / p_mm;
-        let length = TAU * rev * (self.r0 + p_mm * rev / 2.0);
-        return length / total_length;
+        let rev = (radius - self.r0) / self.p_mm;
+        let length = TAU * rev * (self.r0 + self.p_mm * rev / 2.0);
+        return length / self.total_length;
+    }
+    #[allow(unused)]
+    pub fn pos_at_rev(&self, rev: f64) -> f64 {
+        let theta = rev * TAU;
+        let length = theta * (self.r0 + self.p_mm * rev / 2.0);
+        return length / self.total_length;
     }
     #[allow(unused)]
     pub fn pos_at_theta(&self, theta: f64) -> f64 {
-        let p_mm = self.p / 1000.0;
-        let total_length = TAU * self.n * (self.r0 + p_mm * self.n / 2.0);
         let rev = theta / TAU;
-        let length = theta * (self.r0 + p_mm * rev / 2.0);
-        return length / total_length;
+        let length = theta * (self.r0 + self.p_mm * rev / 2.0);
+        return length / self.total_length;
     }
 }
 
@@ -57,12 +75,14 @@ pub struct PhaseSample {
     pub correction_deg: f64
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SampleInterpolation {
     Linear,
     Pchip,
 }
 
+/// Use phase samples with interpolation for correction
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhaseCorrectionSamples {
     pub samples: Vec<PhaseSample>,
@@ -77,16 +97,16 @@ impl PhaseCorrectionSamples {
         if samples.is_empty() { return 0.0; }
         let i = samples.partition_point(|v| v.radius_mm < radius_mm);
         if i == 0 {
-            return samples[0].correction_deg.to_radians();
+            return samples[0].correction_deg / 360.0;
         }
         if i == samples.len() {
-            return samples[i - 1].correction_deg.to_radians();
+            return samples[i - 1].correction_deg / 360.0;
         }
         let a = samples[i - 1];
         let b = samples[i];
         let t = (radius_mm - a.radius_mm) / (b.radius_mm - a.radius_mm);
         let degrees = a.correction_deg + t * (b.correction_deg - a.correction_deg);
-        degrees.to_radians()
+        degrees / 360.0
     }
 
     #[inline]
@@ -97,16 +117,16 @@ impl PhaseCorrectionSamples {
         }
         let i = samples.partition_point(|v| v.radius_mm < radius_mm);
         if i == 0 {
-            return samples[0].correction_deg.to_radians();
+            return samples[0].correction_deg / 360.0;
         }
         if i == samples.len() {
-            return samples[i - 1].correction_deg.to_radians();
+            return samples[i - 1].correction_deg / 360.0;
         }
         
         let x0 = samples[i - 1].radius_mm;
         let x1 = samples[i].radius_mm;
-        let y0 = samples[i - 1].correction_deg.to_radians();
-        let y1 = samples[i].correction_deg.to_radians();
+        let y0 = samples[i - 1].correction_deg / 360.0;
+        let y1 = samples[i].correction_deg / 360.0;
         let h = x1 - x0;
         let t = (radius_mm - x0) / h;
 
@@ -115,7 +135,7 @@ impl PhaseCorrectionSamples {
         }
 
         let secant = |j: usize| -> f64 {
-            (samples[j + 1].correction_deg - samples[j].correction_deg).to_radians() /
+            (samples[j + 1].correction_deg - samples[j].correction_deg) / 360.0 /
             (samples[j + 1].radius_mm - samples[j].radius_mm)
         };
 
@@ -145,7 +165,7 @@ impl PhaseCorrectionSamples {
     }
 
     #[inline]
-    pub fn correction_rad(&self, radius_mm: f64) -> f64 {
+    pub fn correction_rev(&self, radius_mm: f64) -> f64 {
         match self.interpolation {
             SampleInterpolation::Linear => self.linear(radius_mm),
             SampleInterpolation::Pchip => self.pchip(radius_mm),
@@ -153,11 +173,14 @@ impl PhaseCorrectionSamples {
     }
 
     pub fn new(samples: Vec<PhaseSample>, interpolation: SampleInterpolation) -> Self {
+        let mut samples = samples;
+        samples.sort_by(|a, b| a.radius_mm.total_cmp(&b.radius_mm));
         Self { samples, interpolation }
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+/// Lookup table for correction
+#[derive(Debug, Clone, PartialEq)]
 pub struct PhaseCorrectionLut {
     pub radius_min: f64,
     pub step: f64,
@@ -191,10 +214,11 @@ impl PhaseCorrectionLut {
         
     }
 
-    pub fn correction_rad(&self, radius_mm: f64) -> f64 {
-        let max_idx = self.lut.len()- 1;
+    pub fn correction_rev(&self, radius_mm: f64) -> f64 {
+        let max_idx = self.lut.len() - 1;
 
-        let pos = ((radius_mm - self.radius_min) * self.step_inv).clamp(0.0, max_idx as f64);
+        let pos = ((radius_mm - self.radius_min) * self.step_inv)
+            .clamp(0.0, max_idx as f64);
 
         let idx = (pos as usize).min(max_idx - 1);
         let t = pos - idx as f64;
@@ -214,17 +238,17 @@ pub enum PhaseCorrection {
 
 impl PhaseCorrection {
     #[inline]
-    pub fn correction_rad(&self, radius_mm: f64) -> f64 {
+    pub fn correction_rev(&self, radius_mm: f64) -> f64 {
         match self {
-            PhaseCorrection::Samples(curve) => curve.correction_rad(radius_mm),
-            PhaseCorrection::Lut(curve) => curve.correction_rad(radius_mm),
+            PhaseCorrection::Samples(curve) => curve.correction_rev(radius_mm),
+            PhaseCorrection::Lut(curve) => curve.correction_rev(radius_mm),
         }
     }
 
     pub fn to_lut(&self, radius_min: f64, radius_max: f64, step_mm: f64) -> PhaseCorrectionLut {
         match self {
             PhaseCorrection::Lut(phase_correction_lut) => phase_correction_lut.clone(),
-            _ => PhaseCorrectionLut::from_function(radius_min, radius_max, step_mm, |r| self.correction_rad(r))
+            _ => PhaseCorrectionLut::from_function(radius_min, radius_max, step_mm, |r| self.correction_rev(r))
         }
     }
 }
@@ -239,11 +263,11 @@ pub struct CalibratedSpiralGeometry {
 
 impl CalibratedSpiralGeometry {
     #[inline]
-    pub fn polar_at_pos(&self, pos: f64) -> Option<PolarCoord> {
-        let (r, theta) = self.geometry.polar_at_pos(pos)?;
-        let theta_correction = self.phase_correction.as_ref()
-            .map_or(0.0, |p| p.correction_rad(r));
+    pub fn polar_at_pos(&self, pos: f64) -> PolarCoord {
+        let (r, rev) = self.geometry.polar_at_pos(pos);
+        let rev_correction = self.phase_correction.as_ref()
+            .map_or(0.0, |p| p.correction_rev(r));
 
-        Some((r, theta + theta_correction))
+        (r, rev + rev_correction)
     }
 }

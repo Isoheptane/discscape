@@ -1,7 +1,6 @@
-use image::GrayImage;
 use rand::{RngExt, rngs::SmallRng};
 
-use crate::geometry::{CalibratedSpiralGeometry, PolarCoord};
+use crate::{geometry::{CalibratedSpiralGeometry, PolarCoord, SpiralGeometry}, picture::DiscPicture};
 
 pub const AUDIO_CHUNK_SIZE: usize = 2352;
 pub const MODE1_2048_CHUNK_SIZE: usize = 2048;
@@ -37,6 +36,7 @@ pub const F3_TO_F1_POS_LUT: [u8; 24] = [
     10, 11, 18, 19,  4,  5, 12, 13,
     20, 21,  6,  7, 14, 15, 22, 23,
 ];
+
 #[allow(unused)]
 pub const F3_TO_F1_DELAY_LUT: [i64; 24] = [
       3,   6,  11,  14,  19,  22,  27,  30,
@@ -44,119 +44,13 @@ pub const F3_TO_F1_DELAY_LUT: [i64; 24] = [
      81,  84,  89,  92,  97, 100, 105, 108,
 ];
 
-pub fn f1_to_f3(pos: FramePosition) -> Option<FramePosition> {
-    let (frame, byte) = pos;
-    let &pos = F1_TO_F3_POS_LUT.get(byte as usize)?;
-    let &delay = F1_TO_F3_DELAY_LUT.get(byte as usize)?;
-
-    Some((frame.checked_add(delay)?, pos))
-}
-#[allow(unused)]
-pub fn f3_to_f1(pos: FramePosition) -> Option<FramePosition> {
-    let (frame, byte) = pos;
-    let &pos = F3_TO_F1_POS_LUT.get(byte as usize)?;
-    let &delay = F3_TO_F1_DELAY_LUT.get(byte as usize)?;
-
-    Some((frame.checked_sub(delay)?, pos))
-}
-
-pub fn be_bin_to_f3(idx: u64) -> Option<FramePosition> {
-    let frame = (idx / F1_SIZE_BYTES) as i64;
-    let byte = (idx % F1_SIZE_BYTES) as u8;
-
-    f1_to_f3((frame, byte))
-}
-#[allow(unused)]
-pub fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
-    let frame = (idx / F1_SIZE_BYTES) as i64;
-    let byte = ((idx % F1_SIZE_BYTES) as u8) ^ 1;
-
-    f1_to_f3((frame, byte))
-}
-#[allow(unused)]
-pub fn f3_to_be_bin(pos: FramePosition) -> Option<u64> {
-    let (frame, byte) = f3_to_f1(pos)?;
-    u64::try_from(frame).ok()?
-        .checked_mul(F1_SIZE_BYTES)?
-        .checked_add(byte as u64)
-}
-#[allow(unused)]
-pub fn f3_to_le_bin(pos: FramePosition) -> Option<u64> {
-    let (frame, byte) = f3_to_f1(pos)?;
-    u64::try_from(frame).ok()?
-        .checked_mul(F1_SIZE_BYTES)?
-        .checked_add((byte ^ 1) as u64)
-}
-#[allow(unused)]
-pub fn f3_audio_slot(byte: u8) -> Option<u64> {
-    match byte {
-        0..=11 => Some((byte + 1) as u64),
-        12..=23 => Some((byte + 5) as u64),
-        _ => None
-    }
-}
-
+/// F3 frame position to slot in 33 byte frame
 pub const F3_TO_SLOT_MAP: [u8; 24] = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28
 ];
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct CdDisc {
-    pub geometry: CalibratedSpiralGeometry,
-    pub capacity_sectors: u64,
-}
-
-impl CdDisc {
-    // #[allow(unused)]
-    // pub fn from_cdpaint (
-    //     r0: f64,
-    //     tr0: f64,
-    //     dtr: f64,
-    //     sectors: u64
-    // ) -> Self {
-    //     let capacity = sectors as f64 * SECTOR_SIZE_BYTES as f64;
-    //     // tr0 is the averave byte count of first revolution, eff_tr0 have an offset of half revolutions
-    //     let eff_tr0 = tr0 - dtr / 2.0;
-    //     let p = 1000.0 * r0 * dtr / eff_tr0;
-    //     // Continuous equivalent revolution count
-    //     let n = 2.0 * capacity / (eff_tr0 + (eff_tr0 * eff_tr0 + 2.0 * dtr * capacity).sqrt());
-    //     let geometry = SpiralGeometry { r0, p, n };
-    //     let calib_geometry = CalibratedSpiralGeometry { geometry, calibration: PhaseCalibration::default() };
-    // 
-    //     CdDisc { geometry: calib_geometry, capacity_sectors: sectors }
-    // }
-
-    pub fn f3_to_polar_coord(&self, pos: FramePosition) -> Option<PolarCoord> {
-        let (frame, byte) = pos;
-        if frame < 0 {
-            return None;
-        }
-        let frame = frame as u64;
-        let total_frames = self.capacity_sectors * FRAMES_PER_SECTOR;
-        if frame >= total_frames {
-            return None;
-        }
-
-        let total_bits = total_frames * CHANNEL_BITS_PER_FRAME;
-        let bit =
-            frame * CHANNEL_BITS_PER_FRAME
-            + 27
-            + *F3_TO_SLOT_MAP.get(byte as usize)? as u64 * 17
-            + 7;
-        
-        self.geometry.polar_at_pos(bit as f64 / total_bits as f64)
-    }
-
-    pub fn be_bin_to_polar_coord(&self, index: u64) -> Option<PolarCoord> {
-        self.f3_to_polar_coord(be_bin_to_f3(index)?)
-    }
-
-    #[allow(unused)]
-    pub fn le_bin_to_polar_coord(&self, index: u64) -> Option<PolarCoord> {
-        self.f3_to_polar_coord(le_bin_to_f3(index)?)
-    }
-}
+pub static SCRAMBLE_TABLE: [u8; SCRAMBLE_LUT_SIZE_BYTES] = generate_scramble_table();
 
 const fn generate_scramble_table() -> [u8; SCRAMBLE_LUT_SIZE_BYTES] {
     let mut table = [0u8; SCRAMBLE_LUT_SIZE_BYTES];
@@ -172,7 +66,135 @@ const fn generate_scramble_table() -> [u8; SCRAMBLE_LUT_SIZE_BYTES] {
     table
 }
 
-pub static SCRAMBLE_TABLE: [u8; SCRAMBLE_LUT_SIZE_BYTES] = generate_scramble_table();
+/// Maps F1 frame to F3 frame position
+fn f1_to_f3(pos: FramePosition) -> Option<FramePosition> {
+    let (frame, byte) = pos;
+    let &pos = F1_TO_F3_POS_LUT.get(byte as usize)?;
+    let &delay = F1_TO_F3_DELAY_LUT.get(byte as usize)?;
+
+    Some((frame.checked_add(delay)?, pos))
+}
+
+/// Maps F3 frame to F1 frame position
+#[allow(unused)]
+fn f3_to_f1(pos: FramePosition) -> Option<FramePosition> {
+    let (frame, byte) = pos;
+    let &pos = F3_TO_F1_POS_LUT.get(byte as usize)?;
+    let &delay = F3_TO_F1_DELAY_LUT.get(byte as usize)?;
+
+    Some((frame.checked_sub(delay)?, pos))
+}
+
+fn be_bin_to_f3(idx: u64) -> Option<FramePosition> {
+    let frame = (idx / F1_SIZE_BYTES) as i64;
+    let byte = (idx % F1_SIZE_BYTES) as u8;
+
+    f1_to_f3((frame, byte))
+}
+
+#[allow(unused)]
+fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
+    let frame = (idx / F1_SIZE_BYTES) as i64;
+    let byte = ((idx % F1_SIZE_BYTES) as u8) ^ 1;
+
+    f1_to_f3((frame, byte))
+}
+
+#[allow(unused)]
+fn f3_to_be_bin(pos: FramePosition) -> Option<u64> {
+    let (frame, byte) = f3_to_f1(pos)?;
+    u64::try_from(frame).ok()?
+        .checked_mul(F1_SIZE_BYTES)?
+        .checked_add(byte as u64)
+}
+
+#[allow(unused)]
+fn f3_to_le_bin(pos: FramePosition) -> Option<u64> {
+    let (frame, byte) = f3_to_f1(pos)?;
+    u64::try_from(frame).ok()?
+        .checked_mul(F1_SIZE_BYTES)?
+        .checked_add((byte ^ 1) as u64)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CdDisc {
+    geometry: CalibratedSpiralGeometry,
+    capacity_sectors: u64,
+
+    total_frames: u64,
+    total_channel_bits: u64,
+    inv_total_bits: f64,
+}
+
+impl CdDisc {
+
+    pub fn new(geometry: CalibratedSpiralGeometry, sectors: u64) -> Self {
+        let total_frames = sectors * FRAMES_PER_SECTOR;
+        let total_bits = total_frames * CHANNEL_BITS_PER_FRAME;
+
+        Self {
+            geometry, 
+            capacity_sectors: sectors,
+            total_frames: total_frames,
+            total_channel_bits: total_bits,
+            inv_total_bits: 1.0 / total_bits as f64
+        }
+    }
+
+    #[inline] #[allow(unused)] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
+    #[inline] #[allow(unused)] pub fn sectors(&self) -> u64 { self.capacity_sectors }
+
+    #[allow(unused)]
+    pub fn from_cdpaint (
+        r0: f64,
+        tr0: f64,
+        dtr: f64,
+        sectors: u64
+    ) -> Self {
+        let capacity = sectors as f64 * SECTOR_SIZE_BYTES as f64;
+        // tr0 is the averave byte count of first revolution, eff_tr0 have an offset of half revolutions
+        let eff_tr0 = tr0 - dtr / 2.0;
+        let p = 1000.0 * r0 * dtr / eff_tr0;
+        // Continuous equivalent revolution count
+        let n = 2.0 * capacity / (eff_tr0 + (eff_tr0 * eff_tr0 + 2.0 * dtr * capacity).sqrt());
+        let geometry = SpiralGeometry::new(25.0, p, n);
+        let calib_geometry = CalibratedSpiralGeometry { 
+            geometry, 
+            phase_correction: None
+        };
+    
+        Self::new(calib_geometry, sectors)
+    }
+
+    pub fn f3_to_polar_coord(&self, pos: FramePosition) -> Option<PolarCoord> {
+        let (frame, byte) = pos;
+        if frame < 0 {
+            return None;
+        }
+        let frame = frame as u64;
+
+        if frame >= self.total_frames {
+            return None;
+        }
+        
+        let bit =
+            frame * CHANNEL_BITS_PER_FRAME
+            + 27
+            + *F3_TO_SLOT_MAP.get(byte as usize)? as u64 * 17
+            + 7;
+        
+        Some(self.geometry.polar_at_pos(bit as f64 * self.inv_total_bits))
+    }
+
+    pub fn be_bin_to_polar_coord(&self, index: u64) -> Option<PolarCoord> {
+        self.f3_to_polar_coord(be_bin_to_f3(index)?)
+    }
+
+    #[allow(unused)]
+    pub fn le_bin_to_polar_coord(&self, index: u64) -> Option<PolarCoord> {
+        self.f3_to_polar_coord(le_bin_to_f3(index)?)
+    }
+}
 
 #[inline]
 fn u8_to_bcd(val: u8) -> u8 {
@@ -184,31 +206,24 @@ fn u8_to_bcd(val: u8) -> u8 {
 #[inline]
 fn sample_image_luma(
     disc: &CdDisc,
-    image: &GrayImage,
+    image: &DiscPicture,
     byte_idx: u64,
     cdrom: bool
 ) -> u8 {
-    let (r, theta) = if cdrom {
+    let coord = if cdrom {
         disc.le_bin_to_polar_coord(byte_idx).expect("Invalid CD-ROM byte index for polar mapping")
     } else {
         disc.be_bin_to_polar_coord(byte_idx).expect("Invalid audio byte index for polar mapping")
     };
-    let (sin_theta, cos_theta) = theta.sin_cos();
-    let x = cos_theta * r;
-    let y = sin_theta * r;
-    let x = (x + 60.0) / 120.0 * image.width() as f64;
-    let y = (y + 60.0) / 120.0 * image.height() as f64;
-    let x = (x.round() as i32).clamp(0, image.width() as i32 - 1) as u32;
-    let y = (y.round() as i32).clamp(0, image.height() as i32 - 1) as u32;
-    
-    image.get_pixel(x, y).0[0]
+
+    return image.sample_polar(coord);
 }
 
 /// Generates a full audio sector
 #[allow(unused)]
 pub fn generate_audio_chunk(
     disc: &CdDisc,
-    image: &GrayImage,
+    image: &DiscPicture,
     rng: &mut SmallRng,
     sector_num: usize,
 ) -> [u8; AUDIO_CHUNK_SIZE] {
@@ -231,7 +246,7 @@ pub fn generate_audio_chunk(
 #[allow(unused)]
 pub fn generate_mode1_2352_chunk(
     disc: &CdDisc,
-    image: &GrayImage,
+    image: &DiscPicture,
     rng: &mut SmallRng,
     sector_num: usize,
 ) -> [u8; MODE1_2352_CHUNK_SIZE] {
@@ -264,7 +279,7 @@ pub fn generate_mode1_2352_chunk(
 #[allow(unused)]
 pub fn generate_mode1_2048_chunk(
     disc: &CdDisc,
-    image: &GrayImage,
+    image: &DiscPicture,
     rng: &mut SmallRng,
     sector_num: usize,
 ) -> [u8; MODE1_2048_CHUNK_SIZE] {
@@ -287,7 +302,7 @@ pub fn generate_mode1_2048_chunk(
 #[allow(unused)]
 pub fn generate_mode2_2336_chunk(
     disc: &CdDisc,
-    image: &GrayImage,
+    image: &DiscPicture,
     rng: &mut SmallRng,
     sector_num: usize,
 ) -> [u8; MODE2_2336_CHUNK_SIZE] {
