@@ -1,9 +1,9 @@
 [package]
-name = "macroimage-optical"
+name = "discscape"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "Renders a PNG into a Red Book audio image whose spiral track modulation is visible on the data side of a burned CD"
+description = "Renders image into visible patterns on the data side of a CD"
 license = "MIT"
 authors = ["Isoheptane"]
 readme = "README.md"
