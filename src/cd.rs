@@ -1,7 +1,7 @@
 use image::GrayImage;
 use rand::{RngExt, rngs::SmallRng};
 
-use crate::geometry::{CalibratedSpiralGeometry, PhaseCalibration, PolarCoord, SpiralGeometry};
+use crate::geometry::{CalibratedSpiralGeometry, PolarCoord};
 
 pub const AUDIO_CHUNK_SIZE: usize = 2352;
 pub const MODE1_2048_CHUNK_SIZE: usize = 2048;
@@ -108,24 +108,24 @@ pub struct CdDisc {
 }
 
 impl CdDisc {
-    #[allow(unused)]
-    pub fn from_cdpaint (
-        r0: f64,
-        tr0: f64,
-        dtr: f64,
-        sectors: u64
-    ) -> Self {
-        let capacity = sectors as f64 * SECTOR_SIZE_BYTES as f64;
-        // tr0 is the averave byte count of first revolution, eff_tr0 have an offset of half revolutions
-        let eff_tr0 = tr0 - dtr / 2.0;
-        let p = 1000.0 * r0 * dtr / eff_tr0;
-        // Continuous equivalent revolution count
-        let n = 2.0 * capacity / (eff_tr0 + (eff_tr0 * eff_tr0 + 2.0 * dtr * capacity).sqrt());
-        let geometry = SpiralGeometry { r0, p, n };
-        let calib_geometry = CalibratedSpiralGeometry { geometry, calibration: PhaseCalibration::default() };
-
-        CdDisc { geometry: calib_geometry, capacity_sectors: sectors }
-    }
+    // #[allow(unused)]
+    // pub fn from_cdpaint (
+    //     r0: f64,
+    //     tr0: f64,
+    //     dtr: f64,
+    //     sectors: u64
+    // ) -> Self {
+    //     let capacity = sectors as f64 * SECTOR_SIZE_BYTES as f64;
+    //     // tr0 is the averave byte count of first revolution, eff_tr0 have an offset of half revolutions
+    //     let eff_tr0 = tr0 - dtr / 2.0;
+    //     let p = 1000.0 * r0 * dtr / eff_tr0;
+    //     // Continuous equivalent revolution count
+    //     let n = 2.0 * capacity / (eff_tr0 + (eff_tr0 * eff_tr0 + 2.0 * dtr * capacity).sqrt());
+    //     let geometry = SpiralGeometry { r0, p, n };
+    //     let calib_geometry = CalibratedSpiralGeometry { geometry, calibration: PhaseCalibration::default() };
+    // 
+    //     CdDisc { geometry: calib_geometry, capacity_sectors: sectors }
+    // }
 
     pub fn f3_to_polar_coord(&self, pos: FramePosition) -> Option<PolarCoord> {
         let (frame, byte) = pos;

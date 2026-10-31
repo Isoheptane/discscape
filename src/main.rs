@@ -8,8 +8,8 @@ use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::rngs::SmallRng;
 
-use crate::geometry::PhaseSample;
-use crate::{cd::CdDisc, geometry::{CalibratedSpiralGeometry, PhaseCalibration, SpiralGeometry}};
+use crate::geometry::{PhaseCorrectionLut, PhaseCorrectionSamples, PhaseSample, SampleInterpolation};
+use crate::{cd::CdDisc, geometry::{CalibratedSpiralGeometry, PhaseCorrection, SpiralGeometry}};
 
 
 
@@ -22,18 +22,35 @@ fn main() {
         n: 22110.093216189,
     };
 
+    let samples = vec![
+        PhaseSample { radius_mm: 25.0, correction_deg: 0.0 },
+        PhaseSample { radius_mm: 30.0, correction_deg: 0.835 },
+        PhaseSample { radius_mm: 35.0, correction_deg: 0.373 },
+        PhaseSample { radius_mm: 40.0, correction_deg: 0.076 },
+        PhaseSample { radius_mm: 45.0, correction_deg: -0.478 },
+        PhaseSample { radius_mm: 50.0, correction_deg: -0.403 },
+        PhaseSample { radius_mm: 55.0, correction_deg: -0.206 },
+        PhaseSample { radius_mm: 58.0, correction_deg: 0.0 },
+    ];
+
+    // let linear = PhaseCorrectionSamples::new(samples.clone(), SampleInterpolation::Linear);
+    let pchip = PhaseCorrectionSamples::new(samples.clone(), SampleInterpolation::Pchip);
+
+    let calib = PhaseCorrection::Samples(pchip.clone());
+    let lut = PhaseCorrection::Lut(calib.to_lut(25.0, 58.0, 0.1));
+
+    // for i in 0..100 {
+    //     let p1 = linear.correction_rad(25.0 + 0.1 * i as f64);
+    //     let p2 = pchip.correction_rad(25.0 + 0.1 * i as f64);
+    //     let p3 = lut.correction_rad(25.0 + 0.1 * i as f64);
+    // 
+    //     println!("{p1:.4}, {p2:.4}, {p3:.4}");
+    //     println!("{:.4}, {:.4}", p2 - p1, p3 - p2);
+    // }
+
     let calib_geometry = CalibratedSpiralGeometry {
         geometry,
-        calibration: PhaseCalibration { samples: vec![
-            PhaseSample { radius_mm: 25.0, correction_deg: 0.0 },
-            PhaseSample { radius_mm: 30.0, correction_deg: 0.835 },
-            PhaseSample { radius_mm: 35.0, correction_deg: 0.373 },
-            PhaseSample { radius_mm: 40.0, correction_deg: 0.076 },
-            PhaseSample { radius_mm: 45.0, correction_deg: -0.478 },
-            PhaseSample { radius_mm: 50.0, correction_deg: -0.403 },
-            PhaseSample { radius_mm: 55.0, correction_deg: -0.206 },
-            PhaseSample { radius_mm: 58.0, correction_deg: 0.0 },
-        ] }
+        phase_correction: Some(lut)
     };
 
     let disc = CdDisc {
@@ -41,12 +58,12 @@ fn main() {
         capacity_sectors: 359_849,
     };
 
-    let image = ImageReader::open("salt_contrast.png")
+    let image = ImageReader::open("spoke3.png")
         .expect("Failed to open")
         .decode().expect("Failed to decode")
         .to_luma8();
 
-    let file = match File::create("salt.bin") {
+    let file = match File::create("spoke3-2336.bin") {
         Ok(f) => f,
         Err(e) => {
             panic!("Can't open file: {}", e)
@@ -56,8 +73,8 @@ fn main() {
 
     let mut writer = BufWriter::with_capacity(2352 * 75 * 100, file);
 
-    let start_sector: usize = 10637;
-    let end_sector: usize = 359845;
+    let start_sector: usize = 0;
+    let end_sector: usize = 359_845;
     let sector_count: usize = end_sector - start_sector;
     let total_size: usize = sector_count * 2352;
 
