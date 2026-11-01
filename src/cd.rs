@@ -1,19 +1,25 @@
 use rand::{RngExt, rngs::SmallRng};
 
-use crate::{geometry::{CalibratedSpiralGeometry, PolarCoord, SpiralGeometry}, picture::DiscPicture};
+use crate::picture::DiscPicture;
+use crate::geometry::{CalibratedSpiralGeometry, PolarCoord, SpiralGeometry};
 
-pub const SECTOR_SIZE_BYTES: usize = 2352;
-pub const SYNC_SIZE_BYTES: usize = 12;
-pub const SCRAMBLE_LUT_LEN: usize = SECTOR_SIZE_BYTES - SYNC_SIZE_BYTES;
+pub const SECTOR_SIZE_BYTES:        usize = 2352;
+pub const SYNC_SIZE_BYTES:      usize = 12;
+pub const SCRAMBLE_LUT_LEN:         usize = SECTOR_SIZE_BYTES - SYNC_SIZE_BYTES;
 
-pub const F1_FRAME_SIZE_BYTES: usize = 24;
-pub const FRAMES_PER_SECTOR: usize = SECTOR_SIZE_BYTES / F1_FRAME_SIZE_BYTES;
-pub const CHANNEL_BITS_PER_FRAME: u64 = 588;
+pub const F1_FRAME_SIZE_BYTES:      usize = 24;
+pub const FRAMES_PER_SECTOR:        usize = SECTOR_SIZE_BYTES / F1_FRAME_SIZE_BYTES;
+pub const CHANNEL_BITS_PER_FRAME:   u64 = 588;
 
-pub const AUDIO_CHUNK_SIZE: usize = 2352;
-pub const MODE1_2048_CHUNK_SIZE: usize = 2048;
-pub const MODE1_2352_CHUNK_SIZE: usize = 2352;
-pub const MODE2_2336_CHUNK_SIZE: usize = 2336;
+pub const AUDIO_CHUNK_SIZE:         usize = 2352;
+pub const MODE1_2048_CHUNK_SIZE:    usize = 2048;
+pub const MODE1_2352_CHUNK_SIZE:    usize = 2352;
+pub const MODE2_2336_CHUNK_SIZE:    usize = 2336;
+
+/// 10010001001001
+const EFM_BYTE_DENSITY_HIGH:    u8 = 0xAA;
+/// 00000000100000
+const EFM_BYTE_DENSITY_LOW:     u8 = 0x20;
 
 pub type FramePosition = (i64, u8);
 
@@ -234,9 +240,9 @@ pub fn generate_audio_chunk(
     for i in 0..AUDIO_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64, false);
         if rng.random_ratio(luma as u32, 255) {
-            chunk[i] = 0xAA;
+            chunk[i] = EFM_BYTE_DENSITY_HIGH;
         } else {
-            chunk[i] = 0x20;
+            chunk[i] = EFM_BYTE_DENSITY_LOW;
         }
     }
 
@@ -267,9 +273,9 @@ pub fn generate_mode1_2352_chunk(
     for i in 16..MODE1_2352_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64, true);
         if rng.random_ratio(luma as u32, 255) {
-            chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i - 12];
+            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i - 12];
         } else {
-            chunk[i] = 0x20 ^ SCRAMBLE_TABLE[i - 12];
+            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i - 12];
         }
     }
 
@@ -290,9 +296,9 @@ pub fn generate_mode1_2048_chunk(
     for i in 0..MODE1_2048_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
         if rng.random_ratio(luma as u32, 255) {
-            chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i + 4];
+            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {
-            chunk[i] = 0x20 ^ SCRAMBLE_TABLE[i + 4];
+            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
         }
     }
 
@@ -313,11 +319,10 @@ pub fn generate_mode2_2336_chunk(
     for i in 0..MODE2_2336_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
         if rng.random_ratio(luma as u32, 255) {
-            chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i + 4];
+            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {
-            chunk[i] = 0x20 ^ SCRAMBLE_TABLE[i + 4];
+            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
         }
     }
-
     chunk
 }

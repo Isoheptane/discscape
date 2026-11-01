@@ -1,4 +1,6 @@
-use crate::geometry::{CalibratedSpiralGeometry, PolarCoord};
+use rand::{RngExt, rngs::SmallRng};
+
+use crate::{efmplus::{EFMPlusStateMachine, TransitionDensity}, geometry::{CalibratedSpiralGeometry, PolarCoord}, picture::DiscPicture};
 
 
 pub const MAIN_DATA_SIZE:     usize = 2048;
@@ -95,7 +97,7 @@ const fn scramble_all_table() -> [[u8; MAIN_DATA_SIZE]; SCRAMBLE_LFSR_PRESET_SIZ
     let mut i = 0;
 
     while i < SCRAMBLE_LFSR_PRESET_SIZE {
-        lut[i].copy_from_slice(&scramble_sequence(SCRAMBLE_LFSR_INIT[i]));
+        lut[i] = scramble_sequence(SCRAMBLE_LFSR_INIT[i]);
         i += 1;
     }
 
@@ -112,6 +114,12 @@ pub const SYNC_FRAME_BYTES: u64 = 91;
 pub const SYNC_FRAME_CHANNEL_WORDS: u64 = 91 + 2;
 pub const SYNC_FRAME_PER_SECTOR: u64 = RECORD_FRAME_SIZE as u64 / SYNC_FRAME_BYTES;
 pub const PHYSICAL_SECTOR_CHANNEL_WORDS: u64 = SYNC_FRAME_PER_SECTOR * SYNC_FRAME_CHANNEL_WORDS;
+
+/* Sector Information Byte Default Value */
+pub const DVD_MINUS_R_SID_INFO_DEFAULT: u8 = 0x00;
+pub const DVD_MINUS_RW_SID_INFO_DEFAULT: u8 = 0x20;
+pub const DVD_PLUS_R_SID_INFO_DEFAULT: u8 = 0x00;
+pub const DVD_PLUS_RW_SID_INFO_DEFAULT: u8 = 0x62;
 
 #[inline]
 const fn user_to_data(pos: u64) -> u64 {
@@ -133,13 +141,38 @@ const fn recording_to_channel_word(pos: u64) -> u64 {
 }
 
 #[inline]
+const fn user_to_recording(pos: u64) -> u64 {
+    data_to_recording(user_to_data(pos))
+}
+
+#[inline]
 const fn user_to_channel_word(pos: u64) -> u64 {
     recording_to_channel_word(data_to_recording(user_to_data(pos)))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DvdDiscType {
+    PlusR,
+    PlusRw,
+    MinusR,
+    MinusRw,
+}
+
+impl DvdDiscType {
+    pub fn default_sector_id_info_byte(&self) -> u8{
+        match self {
+            DvdDiscType::PlusR => DVD_PLUS_R_SID_INFO_DEFAULT,
+            DvdDiscType::PlusRw => DVD_PLUS_RW_SID_INFO_DEFAULT,
+            DvdDiscType::MinusR => DVD_MINUS_R_SID_INFO_DEFAULT,
+            DvdDiscType::MinusRw => DVD_MINUS_RW_SID_INFO_DEFAULT,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DvdDisc {
     geometry: CalibratedSpiralGeometry,
+    disc_type: DvdDiscType,
     capacity_sectors: u64,
 
     total_channel_words: u64,
@@ -148,12 +181,13 @@ pub struct DvdDisc {
 
 impl DvdDisc {
 
-    pub fn new(geometry: CalibratedSpiralGeometry, sectors: u64) -> Self {
+    pub fn new(geometry: CalibratedSpiralGeometry, disc_type: DvdDiscType, sectors: u64) -> Self {
         let total_channel_words = sectors * PHYSICAL_SECTOR_CHANNEL_WORDS;
         let inv_total_channel_words: f64 = 1.0 / total_channel_words as f64;
 
         Self {
             geometry, 
+            disc_type,
             capacity_sectors: sectors,
             total_channel_words, 
             inv_total_channel_words
@@ -161,6 +195,7 @@ impl DvdDisc {
     }
 
     #[inline] #[allow(unused)] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
+    #[inline] #[allow(unused)] pub fn disc_type(&self) -> &DvdDiscType { &self.disc_type }
     #[inline] #[allow(unused)] pub fn sectors(&self) -> u64 { self.capacity_sectors }
 
     pub fn user_to_polar_coord(&self, pos: u64) -> Option<PolarCoord> {
@@ -170,4 +205,67 @@ impl DvdDisc {
         let channel_word = user_to_channel_word(pos);
         Some(self.geometry.polar_at_pos(channel_word as f64 * self.inv_total_channel_words))
     }
+}
+
+pub fn generate_sector(
+    disc: &DvdDisc,
+    image: &DiscPicture,
+    rng: &mut SmallRng,
+    sector_num: usize,
+) -> [u8; MAIN_DATA_SIZE] {
+    // Set EFM Plus state machine by 12 bytes
+    let mut state = EFMPlusStateMachine::new();
+    // Sector ID
+    state.next(disc.disc_type().default_sector_id_info_byte());
+    let psn = sector_num as u64 + 0x30000;
+    state.next(((psn >> 16) & 0xFF) as u8);
+    state.next(((psn >> 8) & 0xFF) as u8);
+    state.next((psn & 0xFF) as u8);
+    // Initialize scramble table
+    let scramble_table = &SCRAMBLE_LUT[((psn & 0xF0) >> 4) as usize];
+
+    /*
+        TODO: Finish IED Calculation
+    */
+    state.next(0x00);
+    state.next(0x00);
+    // CPR_MAI
+    for _ in 0..6 { state.next(0x00) }
+    
+    // Initialize image luma sampling first
+    const BYTES_PER_IMAGE_SAMPLE: usize = 16;
+    const IMAGE_SAMPLES_LEN: usize = MAIN_DATA_SIZE / BYTES_PER_IMAGE_SAMPLE;
+    let mut image_sampls = [0u8; IMAGE_SAMPLES_LEN];
+    for i in 0..IMAGE_SAMPLES_LEN {
+        /*
+            This is just an simple approximation because we discarded true midpoint calculation.
+            16 byte can span in 18 codewords (+SYNC) or 28 codewords (+PI+SYNC). Which is around 50-60um
+        */
+        let mid_byte = BYTES_PER_IMAGE_SAMPLE * i + (BYTES_PER_IMAGE_SAMPLE / 2);
+        let abs_pos = sector_num as u64 * MAIN_DATA_SIZE as u64 + mid_byte as u64;
+        let coord = disc.user_to_polar_coord(abs_pos).expect("Absolute position out of range");
+        let luma = image.sample_polar(coord);
+        image_sampls[i] = luma;
+    }
+    let image_samples = image_sampls;
+
+    // Start byte sampling
+    let mut chunk = [0u8; MAIN_DATA_SIZE];
+
+    for i in 0..MAIN_DATA_SIZE {
+        let record_frame_pos= user_to_recording(i as u64);
+        if record_frame_pos % 91 == 0 {
+            state.reset();
+        }
+
+        let luma = image_samples[i / BYTES_PER_IMAGE_SAMPLE];
+        let next_byte = if rng.random_ratio(luma as u32, 255) {
+            state.choose(TransitionDensity::HighDensity)
+        } else {
+            state.choose(TransitionDensity::LowDensity)
+        };
+        chunk[i] = next_byte ^ scramble_table[i]
+    }
+
+    chunk
 }

@@ -3,6 +3,7 @@ mod picture;
 mod geometry;
 mod cd;
 mod dvd;
+mod efmplus;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -18,7 +19,6 @@ use crate::cd::CdDisc;
 use crate::picture::{DiscPicture};
 
 fn main() {
-
     let start = Instant::now();
 
     let geometry = SpiralGeometry::new(25.0, 1.510410490, 22110.093216189);
