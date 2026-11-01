@@ -2,6 +2,7 @@ mod sin_table;
 mod picture;
 mod geometry;
 mod cd;
+mod dvd;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -15,9 +16,6 @@ use crate::geometry::{PhaseCorrectionSamples, PhaseSample, SampleInterpolation};
 use crate::geometry::{CalibratedSpiralGeometry, PhaseCorrection, SpiralGeometry};
 use crate::cd::CdDisc;
 use crate::picture::{DiscPicture};
-
-
-
 
 fn main() {
 

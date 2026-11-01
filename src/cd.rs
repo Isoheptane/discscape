@@ -2,28 +2,29 @@ use rand::{RngExt, rngs::SmallRng};
 
 use crate::{geometry::{CalibratedSpiralGeometry, PolarCoord, SpiralGeometry}, picture::DiscPicture};
 
+pub const SECTOR_SIZE_BYTES: usize = 2352;
+pub const SYNC_SIZE_BYTES: usize = 12;
+pub const SCRAMBLE_LUT_LEN: usize = SECTOR_SIZE_BYTES - SYNC_SIZE_BYTES;
+
+pub const F1_FRAME_SIZE_BYTES: usize = 24;
+pub const FRAMES_PER_SECTOR: usize = SECTOR_SIZE_BYTES / F1_FRAME_SIZE_BYTES;
+pub const CHANNEL_BITS_PER_FRAME: u64 = 588;
+
 pub const AUDIO_CHUNK_SIZE: usize = 2352;
 pub const MODE1_2048_CHUNK_SIZE: usize = 2048;
 pub const MODE1_2352_CHUNK_SIZE: usize = 2352;
 pub const MODE2_2336_CHUNK_SIZE: usize = 2336;
 
-pub const F1_SIZE_BYTES: u64 = 24;
-pub const SECTOR_SIZE_BYTES: u64 = 2352;
-pub const FRAMES_PER_SECTOR: u64 = SECTOR_SIZE_BYTES / F1_SIZE_BYTES;
-pub const CHANNEL_BITS_PER_FRAME: u64 = 588;
-pub const SYNC_SIZE_BYTES: u64 = 12;
-pub const SCRAMBLE_LUT_SIZE_BYTES: usize = (SECTOR_SIZE_BYTES - SYNC_SIZE_BYTES) as usize;
-
 pub type FramePosition = (i64, u8);
 
 /// The mapping table for F1 to F3 frame mapping
-pub const F1_TO_F3_POS_LUT: [u8; 24] = [
+pub const F1_TO_F3_POS_LUT: [u8; F1_FRAME_SIZE_BYTES] = [
      0,  1,  6,  7, 12, 13, 18, 19,
      2,  3,  8,  9, 14, 15, 20, 21,
      4,  5, 10, 11, 16, 17, 22, 23,
 ];
 
-pub const F1_TO_F3_DELAY_LUT: [i64; 24] = [
+pub const F1_TO_F3_DELAY_LUT: [i64; F1_FRAME_SIZE_BYTES] = [
       3,   6,  27,  30,  65,  68,  89,  92,
      11,  14,  35,  38,  73,  76,  97, 100,
      19,  22,  43,  46,  81,  84, 105, 108,
@@ -31,33 +32,33 @@ pub const F1_TO_F3_DELAY_LUT: [i64; 24] = [
 
 /// The mapping table for F3 to F1 frame mapping; .0 is position de-map and .1 is delay frame count
 #[allow(unused)]
-pub const F3_TO_F1_POS_LUT: [u8; 24] = [
+pub const F3_TO_F1_POS_LUT: [u8; F1_FRAME_SIZE_BYTES] = [
      0,  1,  8,  9, 16, 17,  2,  3,
     10, 11, 18, 19,  4,  5, 12, 13,
     20, 21,  6,  7, 14, 15, 22, 23,
 ];
 
 #[allow(unused)]
-pub const F3_TO_F1_DELAY_LUT: [i64; 24] = [
+pub const F3_TO_F1_DELAY_LUT: [i64; F1_FRAME_SIZE_BYTES] = [
       3,   6,  11,  14,  19,  22,  27,  30,
      35,  38,  43,  46,  65,  68,  73,  76,
      81,  84,  89,  92,  97, 100, 105, 108,
 ];
 
 /// F3 frame position to slot in 33 byte frame
-pub const F3_TO_SLOT_MAP: [u8; 24] = [
+pub const F3_TO_SLOT_MAP: [u8;  F1_FRAME_SIZE_BYTES] = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28
 ];
 
-pub static SCRAMBLE_TABLE: [u8; SCRAMBLE_LUT_SIZE_BYTES] = generate_scramble_table();
+pub static SCRAMBLE_TABLE: [u8; SCRAMBLE_LUT_LEN] = generate_scramble_table();
 
-const fn generate_scramble_table() -> [u8; SCRAMBLE_LUT_SIZE_BYTES] {
-    let mut table = [0u8; SCRAMBLE_LUT_SIZE_BYTES];
+const fn generate_scramble_table() -> [u8; SCRAMBLE_LUT_LEN] {
+    let mut table = [0u8; SCRAMBLE_LUT_LEN];
     let mut lfsr: u32 = 0x0001;
     let mut i = 0;
 
-    while i < SCRAMBLE_LUT_SIZE_BYTES {
+    while i < SCRAMBLE_LUT_LEN {
         table[i as usize] = (lfsr & 0xFF) as u8;
         let feedback = (lfsr ^ (lfsr >> 1)) & 0xFF;
         lfsr = (feedback << 7 ^ (lfsr >> 8)) & 0x7FFF;
@@ -86,16 +87,16 @@ fn f3_to_f1(pos: FramePosition) -> Option<FramePosition> {
 }
 
 fn be_bin_to_f3(idx: u64) -> Option<FramePosition> {
-    let frame = (idx / F1_SIZE_BYTES) as i64;
-    let byte = (idx % F1_SIZE_BYTES) as u8;
+    let frame = (idx / F1_FRAME_SIZE_BYTES as u64) as i64;
+    let byte = (idx % F1_FRAME_SIZE_BYTES as u64) as u8;
 
     f1_to_f3((frame, byte))
 }
 
 #[allow(unused)]
 fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
-    let frame = (idx / F1_SIZE_BYTES) as i64;
-    let byte = ((idx % F1_SIZE_BYTES) as u8) ^ 1;
+    let frame = (idx / F1_FRAME_SIZE_BYTES as u64) as i64;
+    let byte = ((idx % F1_FRAME_SIZE_BYTES as u64) as u8) ^ 1;
 
     f1_to_f3((frame, byte))
 }
@@ -104,7 +105,7 @@ fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
 fn f3_to_be_bin(pos: FramePosition) -> Option<u64> {
     let (frame, byte) = f3_to_f1(pos)?;
     u64::try_from(frame).ok()?
-        .checked_mul(F1_SIZE_BYTES)?
+        .checked_mul(F1_FRAME_SIZE_BYTES as u64)?
         .checked_add(byte as u64)
 }
 
@@ -112,7 +113,7 @@ fn f3_to_be_bin(pos: FramePosition) -> Option<u64> {
 fn f3_to_le_bin(pos: FramePosition) -> Option<u64> {
     let (frame, byte) = f3_to_f1(pos)?;
     u64::try_from(frame).ok()?
-        .checked_mul(F1_SIZE_BYTES)?
+        .checked_mul(F1_FRAME_SIZE_BYTES as u64)?
         .checked_add((byte ^ 1) as u64)
 }
 
@@ -129,7 +130,7 @@ pub struct CdDisc {
 impl CdDisc {
 
     pub fn new(geometry: CalibratedSpiralGeometry, sectors: u64) -> Self {
-        let total_frames = sectors * FRAMES_PER_SECTOR;
+        let total_frames = sectors * FRAMES_PER_SECTOR as u64;
         let total_bits = total_frames * CHANNEL_BITS_PER_FRAME;
 
         Self {
@@ -229,9 +230,9 @@ pub fn generate_audio_chunk(
 ) -> [u8; AUDIO_CHUNK_SIZE] {
     let mut chunk = [0; AUDIO_CHUNK_SIZE];
 
-    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..AUDIO_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, sector_base + i as u64, false);
+        let luma = sample_image_luma(disc, image, (sector_base + i) as u64, false);
         if rng.random_ratio(luma as u32, 255) {
             chunk[i] = 0xAA;
         } else {
@@ -262,9 +263,9 @@ pub fn generate_mode1_2352_chunk(
     chunk[14] = u8_to_bcd((msf % 75) as u8);
     chunk[15] = 0x01;
 
-    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 16..MODE1_2352_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, sector_base + i as u64, true);
+        let luma = sample_image_luma(disc, image, (sector_base + i) as u64, true);
         if rng.random_ratio(luma as u32, 255) {
             chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i - 12];
         } else {
@@ -285,9 +286,9 @@ pub fn generate_mode1_2048_chunk(
 ) -> [u8; MODE1_2048_CHUNK_SIZE] {
     let mut chunk = [0; MODE1_2048_CHUNK_SIZE];
 
-    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE1_2048_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, sector_base + i as u64 + 16, true);
+        let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
         if rng.random_ratio(luma as u32, 255) {
             chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i + 4];
         } else {
@@ -308,9 +309,9 @@ pub fn generate_mode2_2336_chunk(
 ) -> [u8; MODE2_2336_CHUNK_SIZE] {
     let mut chunk = [0; MODE2_2336_CHUNK_SIZE];
 
-    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES;
+    let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE2_2336_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, sector_base + i as u64 + 16, true);
+        let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
         if rng.random_ratio(luma as u32, 255) {
             chunk[i] = 0xAA ^ SCRAMBLE_TABLE[i + 4];
         } else {

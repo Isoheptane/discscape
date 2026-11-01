@@ -70,12 +70,12 @@ Sector ID have 32 bits
 The sector information bits are
 | bit | Meaning | Indicates |
 | --- | :- | :- |
-| b31 | Sector format type | 1: CLD format ; 0: Zoned format |
+| b31 | Sector format type | 1: Zoned format ; 0: CLD format |
 | b30 | Tracking method | 1: Groove tracking; 0: Pit tracking |
 | b29 | Reflectivity | 1: Reflectivity <= 40%; 0: Reflectivity > 40% | 
 | b28 | Reserved | Shall be set to 0 |
 | b27 / b26 | Zone Type | 00: Data Zone; 01: Lead-in Zone; 10: Lead-out zone |
-| b25 | Data Type | 1: Rewritable / Recordable data; 0: Linking data;
+| b25 | Data Type | 1: Linking Data; 0: Rewritable / Recordable data;
 | b24 | Layer number | 0: Layer 0; 1: Layer 1|
 
 For fast checking, use these values:
@@ -157,7 +157,7 @@ A Recording frame is a 13 row * 182 bytes block.
 ### EFM Plus Modulation
 
 #### Sync Frame
-EFM Plus state machine resets to 1 on every 91 bytes after each SYNC channel bits, thus a recording rrame can be split into 
+EFM Plus state machine resets to 1 on every 91 bytes after each SYNC channel bits, thus a recording rrame can be split into 26 sync frames.
 
 ```
 +------+---------------------+------+---------------------+
@@ -167,5 +167,9 @@ EFM Plus state machine resets to 1 on every 91 bytes after each SYNC channel bit
 +------+---------------------+------+---------------------+
 | SYNC | Row 12 Part 1 (91B) | SYNC | Row 12 Part 2 (91B) |
 +------+---------------------+------+---------------------+
+| SYNC | Row 13 Part 1 (91B) | SYNC | Row 13 Part 2 (91B) |
++------+---------------------+------+---------------------+
 
 ```
+
+Where SYNC is 32 channel-bits long, and parts are 91*16=1456 channel-bits long.
