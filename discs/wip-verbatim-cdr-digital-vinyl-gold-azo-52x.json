@@ -1,13 +1,11 @@
 {
     "disc": {
-        "media_family": "CD",
-        "media_type": "R",
-        "brand": "Verbatim",
-        "description": "Verbatim Digital Vinyl Gold AZO CD-R 52x",
-        "sectors": 359848
+        "family": "CD",
+        "type": "CD-R",
+        "capacity_sectors": 359848
     },
     "geometry": {
-        "r0": 25.0,
+        "r": 25.0,
         "pitch": 1.509401579,
         "n": 22119.863037380
     },
@@ -15,8 +13,18 @@
         "radius_mm": [],
         "correction_deg": []
     },
-    "test_environment": {
-        "drive_model": "HP DVD A DS8ACSH",
-        "test_speed_x": 16
+    "metadata": {
+        "media": {
+            "brand": "Verbatim",
+            "description": "Verbatim Digital Vinyl Gold AZO CD-R 52x",
+            "rated_speed": "52x"
+        },
+        "recording": {
+            "drive": "HP DVD A DS8ACSH",
+            "firmware": "LHS3",
+            "speed_x": 16,
+            "software": "cdrdao",
+            "date": null
+        }
     }
 }

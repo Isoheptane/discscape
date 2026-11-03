@@ -1,6 +1,6 @@
 use rand::{RngExt, rngs::SmallRng};
 
-use crate::{efmplus::{EFMPlusStateMachine, TransitionDensity}, geometry::{CalibratedSpiralGeometry, PolarCoord}, picture::DiscPicture};
+use crate::{efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity}, geometry::{CalibratedSpiralGeometry, PolarCoord}, picture::DiscPicture};
 
 
 pub const MAIN_DATA_SIZE:     usize = 2048;
@@ -246,12 +246,12 @@ pub fn generate_sector(
     const IMAGE_SAMPLES_LEN: usize = PHYSICAL_SECTOR_CHANNEL_WORDS as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
     assert_eq!(PHYSICAL_SECTOR_CHANNEL_WORDS as usize % CHANNEL_WORDS_PER_IMAGE_SAMPLE, 0);
 
-    // 2412 = 2 x 3 x 13 x 31, take one sample per 6 channel words
+    // 2418 = 2 x 3 x 13 x 31, take one sample per 6 channel words
 
     let mut image_samples = [0u8; IMAGE_SAMPLES_LEN];
 
     for i in 0..IMAGE_SAMPLES_LEN {
-        let mid_word = i * CHANNEL_WORDS_PER_IMAGE_SAMPLE + 3;
+        let mid_word = i * CHANNEL_WORDS_PER_IMAGE_SAMPLE + (CHANNEL_WORDS_PER_IMAGE_SAMPLE / 2);
         let abs_pos = 
             sector_num as u64
             * PHYSICAL_SECTOR_CHANNEL_WORDS as u64
@@ -275,10 +275,12 @@ pub fn generate_sector(
 
         let luma = image_samples[channel_word as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE];
         let next_byte = if rng.random_ratio(luma as u32, 255) {
-            state.choose(TransitionDensity::HighDensity)
+            EFMPlusStrategy::choose(state.state(), TransitionDensity::HighDensity)
         } else {
-            state.choose(TransitionDensity::LowDensity)
+            EFMPlusStrategy::choose(state.state(), TransitionDensity::LowDensity)
         };
+        state.next(next_byte);
+
         chunk[i] = next_byte ^ scramble_table[i]
     }
 

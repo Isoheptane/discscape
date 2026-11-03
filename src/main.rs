@@ -13,6 +13,7 @@ use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::rngs::SmallRng;
 
+use crate::dvd::{DvdDisc, DvdDiscType};
 use crate::geometry::{PhaseCorrectionSamples, PhaseSample, SampleInterpolation};
 use crate::geometry::{CalibratedSpiralGeometry, PhaseCorrection, SpiralGeometry};
 use crate::cd::CdDisc;
@@ -21,7 +22,11 @@ use crate::picture::{DiscPicture};
 fn main() {
     let start = Instant::now();
 
-    let geometry = SpiralGeometry::new(25.0, 1.510410490, 22110.093216189);
+    let geometry = SpiralGeometry::new(
+        24.830758376375062, 
+        1.5001855170532903, 
+        22110.093216189
+    );
 
     let samples = vec![
         PhaseSample { radius_mm: 25.0, correction_deg: 0.0 },
@@ -54,17 +59,30 @@ fn main() {
         phase_correction: Some(lut)
     };
 
-    
-
     let disc = CdDisc::new(calib_geometry, 359849);
 
-    let image = ImageReader::open("salt_contrast.png")
+    // DVD Codes
+
+    let geometry = SpiralGeometry::new(
+        24.0, 
+        0.74, 
+        46000.0
+    );
+
+    let calib_geo = CalibratedSpiralGeometry {
+        geometry,
+        phase_correction: None
+    };
+
+    let disc = DvdDisc::new(calib_geo, DvdDiscType::PlusR, 2_295_104);
+
+    let image = ImageReader::open("spoke.png")
         .expect("Failed to open")
         .decode().expect("Failed to decode");
 
     let picture = DiscPicture::new(image);
 
-    let file = match File::create("salt-2336.bin") {
+    let file = match File::create("spoke.iso") {
         Ok(f) => f,
         Err(e) => {
             panic!("Can't open file: {}", e)
@@ -75,29 +93,33 @@ fn main() {
     let mut writer = BufWriter::with_capacity(1024 * 1024, file);
 
     let start_sector: usize = 0;
-    let end_sector: usize = 359845;
+    let end_sector: usize = 2_295_104;
     let sector_count: usize = end_sector - start_sector;
 
-    // println!("Start Position: {:#?}", disc.geometry().polar_at_pos(0.0));
-    // println!("End Position: {:#?}", disc.geometry().polar_at_pos(1.0));
-    // println!("End Radius: {:#?}", disc.geometry().geometry.outer_radius_mm());
+    println!("Start Position: {:#?}", disc.geometry().polar_at_pos(0.0));
+    println!("End Position: {:#?}", disc.geometry().polar_at_pos(1.0));
+    println!("End Radius: {:#?}", disc.geometry().geometry.outer_radius_mm());
 
     let mut rng: SmallRng = rand::make_rng();
 
-    let bar = ProgressBar::new(sector_count as u64);
+    let bar = ProgressBar::new(sector_count as u64 * 2048);
 
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos:>7}/{len} sectors")
+    // bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos:>7}/{len} sectors")
+    //     .unwrap()
+    //     .progress_chars("##.")
+    // );
+    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} sectors")
         .unwrap()
         .progress_chars("##.")
     );
 
     for sector in start_sector..end_sector {
 
-        let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-
+        let chunk = dvd::generate_sector(&disc, &picture, &mut rng, sector);
+        // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
         writer.write_all(&chunk).expect("Failed to write to writer");
 
-        bar.inc(1);
+        bar.inc(2048);
 
     }
     writer.flush().expect("Failed to flush buffer");
@@ -108,5 +130,5 @@ fn main() {
     let ms = end.duration_since(start).as_nanos();
     println!("Job done in {:.3} seconds", ms as f64 / 1_000_000_000.0)
 
-    // file.write_all(&bytes).expect("Failed to write.");
+    
 }

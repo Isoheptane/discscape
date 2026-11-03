@@ -1,0 +1,30 @@
+{
+    "disc": {
+        "family": "DVD",
+        "type": "DVD+R",
+        "capacity_sectors": 2295104
+    },
+    "geometry": {
+        "r": 24.0,
+        "pitch": 0.74,
+        "n": 46000
+    },
+    "correction_samples": {
+        "radius_mm": [],
+        "correction_deg": []
+    },
+    "metadata": {
+        "media": {
+            "brand": "Verbatim",
+            "description": "Verbatim DVD+R AZO Verbatim#43498",
+            "rated_speed": "16x"
+        },
+        "recording": {
+            "drive": "HP DVD A DS8ACSH",
+            "firmware": "LHS3",
+            "speed_x": 8,
+            "software": "growisofs",
+            "date": "2026-11-03"
+        }
+    }
+}
