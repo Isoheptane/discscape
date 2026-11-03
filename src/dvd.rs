@@ -205,6 +205,13 @@ impl DvdDisc {
         let channel_word = user_to_channel_word(pos);
         Some(self.geometry.polar_at_pos(channel_word as f64 * self.inv_total_channel_words))
     }
+
+    pub fn channel_word_to_polar_coord(&self, pos: u64) -> Option<PolarCoord> {
+        if pos >= self.total_channel_words {
+            return None;
+        }
+        Some(self.geometry.polar_at_pos(pos as f64 * self.inv_total_channel_words))
+    }
 }
 
 pub fn generate_sector(
@@ -226,39 +233,47 @@ pub fn generate_sector(
 
     /*
         TODO: Finish IED Calculation
+        Without IED calculation, the EFM Plus state can not be correctly predicted for first recording frame.
     */
+
     state.next(0x00);
     state.next(0x00);
     // CPR_MAI
     for _ in 0..6 { state.next(0x00) }
     
     // Initialize image luma sampling first
-    const BYTES_PER_IMAGE_SAMPLE: usize = 16;
-    const IMAGE_SAMPLES_LEN: usize = MAIN_DATA_SIZE / BYTES_PER_IMAGE_SAMPLE;
-    let mut image_sampls = [0u8; IMAGE_SAMPLES_LEN];
+    const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
+    const IMAGE_SAMPLES_LEN: usize = PHYSICAL_SECTOR_CHANNEL_WORDS as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
+    assert_eq!(PHYSICAL_SECTOR_CHANNEL_WORDS as usize % CHANNEL_WORDS_PER_IMAGE_SAMPLE, 0);
+
+    // 2412 = 2 x 3 x 13 x 31, take one sample per 6 channel words
+
+    let mut image_samples = [0u8; IMAGE_SAMPLES_LEN];
+
     for i in 0..IMAGE_SAMPLES_LEN {
-        /*
-            This is just an simple approximation because we discarded true midpoint calculation.
-            16 byte can span in 18 codewords (+SYNC) or 28 codewords (+PI+SYNC). Which is around 50-60um
-        */
-        let mid_byte = BYTES_PER_IMAGE_SAMPLE * i + (BYTES_PER_IMAGE_SAMPLE / 2);
-        let abs_pos = sector_num as u64 * MAIN_DATA_SIZE as u64 + mid_byte as u64;
-        let coord = disc.user_to_polar_coord(abs_pos).expect("Absolute position out of range");
+        let mid_word = i * CHANNEL_WORDS_PER_IMAGE_SAMPLE + 3;
+        let abs_pos = 
+            sector_num as u64
+            * PHYSICAL_SECTOR_CHANNEL_WORDS as u64
+            + mid_word as u64;
+        
+        let coord = disc.channel_word_to_polar_coord(abs_pos).expect("Absolute value out of range");
         let luma = image.sample_polar(coord);
-        image_sampls[i] = luma;
+        image_samples[i] = luma;
     }
-    let image_samples = image_sampls;
+    let image_samples = image_samples;
 
     // Start byte sampling
     let mut chunk = [0u8; MAIN_DATA_SIZE];
 
     for i in 0..MAIN_DATA_SIZE {
-        let record_frame_pos= user_to_recording(i as u64);
-        if record_frame_pos % 91 == 0 {
+        let channel_word = user_to_channel_word(i as u64);
+        // Frame head reset event, immediately after 2 word sync
+        if channel_word % 93 == 2 {
             state.reset();
         }
 
-        let luma = image_samples[i / BYTES_PER_IMAGE_SAMPLE];
+        let luma = image_samples[channel_word as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE];
         let next_byte = if rng.random_ratio(luma as u32, 255) {
             state.choose(TransitionDensity::HighDensity)
         } else {
