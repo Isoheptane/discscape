@@ -3,66 +3,33 @@ use rand::{RngExt, rngs::SmallRng};
 use crate::{efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity}, geometry::{CalibratedSpiralGeometry, PolarCoord}, picture::DiscPicture};
 
 
-pub const MAIN_DATA_SIZE:     usize = 2048;
-pub const DATA_FRAME_SIZE:    usize = 2064;
+pub const MAIN_DATA_SIZE: usize         = 2048;
 
-pub const SECTOR_ID_SIZE: usize = 4;
-pub const IED_SIZE: usize = 2;
-pub const CPR_MAI_SIZE: usize = 6;
-pub const EDC_SIZE: usize = 4;
+pub const DATA_FRAME_ROW_COUNT: usize   = 12;
+pub const DATA_FRAME_ROW_SIZE: usize    = 172;
+pub const DATA_FRAME_SIZE: usize        = DATA_FRAME_ROW_SIZE * DATA_FRAME_ROW_COUNT;
 
-pub const SECTOR_ID_OFFSET: usize = 0;
-pub const IED_OFFSET: usize = SECTOR_ID_OFFSET + SECTOR_ID_SIZE;
-pub const CPR_MAI_OFFSET: usize = IED_OFFSET + IED_SIZE;
-pub const MAIN_DATA_OFFSET: usize = CPR_MAI_OFFSET + CPR_MAI_SIZE;
-pub const EDC_OFFSET: usize = MAIN_DATA_OFFSET + MAIN_DATA_SIZE;
+pub const SECTOR_ID_SIZE: usize         = 4;
+pub const IED_SIZE: usize               = 2;
+pub const CPR_MAI_SIZE: usize           = 6;
+// pub const EDC_SIZE: usize            = 4;
 
-pub const SID_INFO_OFFSET: usize = 0;
-pub const SID_PSN_OFFSET: usize = 1;
-pub const SID_PSN_SIZE: usize = 3;
+pub const SECTOR_ID_OFFSET: usize       = 0;
+pub const IED_OFFSET: usize             = SECTOR_ID_OFFSET + SECTOR_ID_SIZE;
+pub const CPR_MAI_OFFSET: usize         = IED_OFFSET + IED_SIZE;
+pub const MAIN_DATA_OFFSET: usize       = CPR_MAI_OFFSET + CPR_MAI_SIZE;
+// pub const EDC_OFFSET: usize          = MAIN_DATA_OFFSET + MAIN_DATA_SIZE;
 
-/* Sector Information */
+// pub const SID_INFO_OFFSET: usize     = 0;
+// pub const SID_PSN_OFFSET: usize      = 1;
+// pub const SID_PSN_SIZE: usize        = 3;
+
+/* Scrambler */
 
 /*
-The sector information bits are
-| bit | Meaning | Indicates |
-| --- | :- | :- |
-| b31 | Sector format type | 1: Zoned format ; 0: CLD format |
-| b30 | Tracking method | 1: Groove tracking; 0: Pit tracking |
-| b29 | Reflectivity | 1: Reflectivity <= 40%; 0: Reflectivity > 40% | 
-| b28 | Reserved | Shall be set to 0 |
-| b27 / b26 | Zone Type | 00: Data Zone; 01: Lead-in Zone; 10: Lead-out zone |
-| b25 | Data Type | 1: Linking Data; 0: Rewritable / Recordable data;
-| b24 | Layer number | 0: Layer 0; 1: Layer 1|
+    The Scrambler uses 16 presets. Each 16 sector uses one preset and continue 
+
 */
-
-pub const SID_INFO_FORMAT: u8 = 0x80;
-pub const SID_INFO_TRACKING: u8 = 0x40;
-pub const SID_INFO_REFLECTIVITY: u8 = 0x20;
-pub const SID_INFO_RESERVED: u8 = 0x10;
-pub const SID_INFO_ZONE_TYPE: u8 = 0x0C;
-pub const SID_INFO_DATA_TYPE: u8 = 0x02;
-pub const SID_INFO_LAYER: u8 = 0x01;
-
-pub const SID_INFO_FORMAT_CLD: u8 = 0x00;
-pub const SID_INFO_FORMAT_ZONED: u8 = SID_INFO_FORMAT;
-
-pub const SID_INFO_TRACKING_PIT: u8 = 0x00;
-pub const SID_INFO_TRACKING_GROOVE: u8 = SID_INFO_TRACKING;
-
-pub const SID_INFO_REFLECTIVITY_GT40: u8 = 0x00;
-pub const SID_INFO_REFLECTIVITY_LT40: u8 = SID_INFO_REFLECTIVITY;
-
-pub const SID_INFO_ZONE_DATA: u8 = 0x00;
-pub const SID_INFO_ZONE_LEAD_IN: u8 = 0x04;
-pub const SID_INFO_ZONE_LEAD_OUT: u8 = 0x08;
-
-pub const SID_INFO_DATA_TYPE_LINKING: u8 = SID_INFO_DATA_TYPE;
-
-pub const SID_INFO_LAYER_0: u8 = 0x00;
-pub const SID_INFO_LAYER_1: u8 = SID_INFO_LAYER;
-
-/* SCRAMBLER */
 
 pub const SCRAMBLE_LFSR_PRESET_SIZE: usize = 16;
 pub const SCRAMBLE_LFSR_INIT: [u16; SCRAMBLE_LFSR_PRESET_SIZE] = [
@@ -105,50 +72,64 @@ const fn scramble_all_table() -> [[u8; MAIN_DATA_SIZE]; SCRAMBLE_LFSR_PRESET_SIZ
 }
 
 /* Record Frame sizes */
-pub const RECORD_FRAME_SIZE: usize = (DATA_FRAME_SIZE / 12 + 10) * 13;
+pub const RECORD_FRAME_ROW_COUNT: u64   = 13;
+pub const RECORD_FRAME_ROW_SIZE: u64    = 182;
+pub const RECORD_FRAME_SIZE: u64        = RECORD_FRAME_ROW_SIZE * RECORD_FRAME_ROW_COUNT;
 
-/* EFM Plus Constants */
-pub const CHANNEL_WORD_BITS: u64 = 16;
+/* Channel Constants */
+// Assume a channel word is 16 channel bits //
+
+// pub const CHANNEL_WORD_BITS: u64 = 16;
 pub const SYNC_CHANNEL_WORDS: u64 = 2;
 pub const SYNC_FRAME_BYTES: u64 = 91;
-pub const SYNC_FRAME_CHANNEL_WORDS: u64 = 91 + 2;
+pub const SYNC_FRAME_CHANNEL_WORDS: u64 = SYNC_FRAME_BYTES + SYNC_CHANNEL_WORDS;
 pub const SYNC_FRAME_PER_SECTOR: u64 = RECORD_FRAME_SIZE as u64 / SYNC_FRAME_BYTES;
+
 pub const PHYSICAL_SECTOR_CHANNEL_WORDS: u64 = SYNC_FRAME_PER_SECTOR * SYNC_FRAME_CHANNEL_WORDS;
 
-/* Sector Information Byte Default Value */
-pub const DVD_MINUS_R_SID_INFO_DEFAULT: u8 = 0x00;
-pub const DVD_MINUS_RW_SID_INFO_DEFAULT: u8 = 0x20;
-pub const DVD_PLUS_R_SID_INFO_DEFAULT: u8 = 0x00;
-pub const DVD_PLUS_RW_SID_INFO_DEFAULT: u8 = 0x62;
-
 #[inline]
-const fn user_to_data(pos: u64) -> u64 {
+const fn main_to_data_index(pos: u64) -> u64 {
     pos 
         + (pos / MAIN_DATA_SIZE as u64) * (DATA_FRAME_SIZE - MAIN_DATA_SIZE) as u64
         + MAIN_DATA_OFFSET as u64
 }
 
 #[inline]
-const fn data_to_recording(pos: u64) -> u64 {
+const fn data_to_recording_index(pos: u64) -> u64 {
     pos 
-        + (pos / DATA_FRAME_SIZE as u64) * 182
-        + (pos / 172) * 10
+        + (pos / DATA_FRAME_SIZE as u64) * RECORD_FRAME_ROW_SIZE
+        + (pos / DATA_FRAME_ROW_SIZE as u64) * 10
 }
 
 #[inline]
-const fn recording_to_channel_word(pos: u64) -> u64 {
-    pos + (pos / 91 + 1) * SYNC_CHANNEL_WORDS
+const fn recording_to_channel_word_index(pos: u64) -> u64 {
+    pos + (pos / SYNC_FRAME_BYTES + 1) * SYNC_CHANNEL_WORDS
 }
 
 #[inline]
-const fn user_to_recording(pos: u64) -> u64 {
-    data_to_recording(user_to_data(pos))
+const fn main_to_channel_word_index(pos: u64) -> u64 {
+    recording_to_channel_word_index(data_to_recording_index(main_to_data_index(pos)))
 }
 
-#[inline]
-const fn user_to_channel_word(pos: u64) -> u64 {
-    recording_to_channel_word(data_to_recording(user_to_data(pos)))
-}
+/*
+The sector information bits are
+| bit | Meaning | Indicates |
+| --- | :- | :- |
+| b31 | Sector format type | 1: Zoned format ; 0: CLD format |
+| b30 | Tracking method | 1: Groove tracking; 0: Pit tracking |
+| b29 | Reflectivity | 1: Reflectivity <= 40%; 0: Reflectivity > 40% | 
+| b28 | Reserved | Shall be set to 0 |
+| b27 / b26 | Zone Type | 00: Data Zone; 01: Lead-in Zone; 10: Lead-out zone |
+| b25 | Data Type | 1: Linking Data; 0: Rewritable / Recordable data;
+| b24 | Layer number | 0: Layer 0; 1: Layer 1|
+*/
+
+/* Sector Information Byte Default Value */
+
+pub const DVD_MINUS_R_SID_INFO_DEFAULT: u8  = 0x00;
+pub const DVD_MINUS_RW_SID_INFO_DEFAULT: u8 = 0x20;
+pub const DVD_PLUS_R_SID_INFO_DEFAULT: u8   = 0x00;
+pub const DVD_PLUS_RW_SID_INFO_DEFAULT: u8  = 0x62;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DvdDiscType {
@@ -198,19 +179,8 @@ impl DvdDisc {
     #[inline] #[allow(unused)] pub fn disc_type(&self) -> &DvdDiscType { &self.disc_type }
     #[inline] #[allow(unused)] pub fn sectors(&self) -> u64 { self.capacity_sectors }
 
-    pub fn user_to_polar_coord(&self, pos: u64) -> Option<PolarCoord> {
-        if pos >= self.capacity_sectors * MAIN_DATA_SIZE as u64 {
-            return None;
-        }
-        let channel_word = user_to_channel_word(pos);
-        Some(self.geometry.polar_at_pos(channel_word as f64 * self.inv_total_channel_words))
-    }
-
-    pub fn channel_word_to_polar_coord(&self, pos: u64) -> Option<PolarCoord> {
-        if pos >= self.total_channel_words {
-            return None;
-        }
-        Some(self.geometry.polar_at_pos(pos as f64 * self.inv_total_channel_words))
+    pub fn channel_word_to_polar_coord(&self, pos: u64) -> PolarCoord {
+        self.geometry.polar_at_pos(pos as f64 * self.inv_total_channel_words)
     }
 }
 
@@ -229,17 +199,20 @@ pub fn generate_sector(
     state.next(((psn >> 8) & 0xFF) as u8);
     state.next((psn & 0xFF) as u8);
     // Initialize scramble table
-    let scramble_table = &SCRAMBLE_LUT[((psn & 0xF0) >> 4) as usize];
+    let scramble_table = &SCRAMBLE_LUT[((psn >> 4) & 0x0F) as usize];
 
     /*
         TODO: Finish IED Calculation
         Without IED calculation, the EFM Plus state can not be correctly predicted for first recording frame.
+
+        But all bytes are selected for returning to state 1.
+        Ideally state will turn to 1 after 13 bytes (counted from data frame )
     */
 
     state.next(0x00);
     state.next(0x00);
     // CPR_MAI
-    for _ in 0..6 { state.next(0x00) }
+    for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
     
     // Initialize image luma sampling first
     const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
@@ -251,13 +224,15 @@ pub fn generate_sector(
     let mut image_samples = [0u8; IMAGE_SAMPLES_LEN];
 
     for i in 0..IMAGE_SAMPLES_LEN {
-        let mid_word = i * CHANNEL_WORDS_PER_IMAGE_SAMPLE + (CHANNEL_WORDS_PER_IMAGE_SAMPLE / 2);
+        let mid_word =
+            i * CHANNEL_WORDS_PER_IMAGE_SAMPLE
+            + (CHANNEL_WORDS_PER_IMAGE_SAMPLE / 2);
         let abs_pos = 
             sector_num as u64
             * PHYSICAL_SECTOR_CHANNEL_WORDS as u64
             + mid_word as u64;
         
-        let coord = disc.channel_word_to_polar_coord(abs_pos).expect("Absolute value out of range");
+        let coord = disc.channel_word_to_polar_coord(abs_pos);
         let luma = image.sample_polar(coord);
         image_samples[i] = luma;
     }
@@ -267,8 +242,9 @@ pub fn generate_sector(
     let mut chunk = [0u8; MAIN_DATA_SIZE];
 
     for i in 0..MAIN_DATA_SIZE {
-        let channel_word = user_to_channel_word(i as u64);
+        let channel_word = main_to_channel_word_index(i as u64);
         // Frame head reset event, immediately after 2 word sync
+        // Each sync immediately follows main data section except first sync
         if channel_word % 93 == 2 {
             state.reset();
         }

@@ -1,5 +1,7 @@
 ## Calibration process
-Sign convention: When viewed from data side, clockwise is positive. The calibration process should use a spoke image. 
+Sign convention: When viewed from data side, clockwise is positive.
+
+The calibration process should use a spoke image. 
 
 ### Idea
 Imagine we are painting a string, and the goal is to let it form a good looking spoke image when it winds back to a spiral. The spiral is described by three geometric parameters: start radius ($r_0$), pitch ($p$) and revolutions count ($N$).
@@ -24,7 +26,7 @@ We need to fix $r_0$ for initial calibration process. The true value can vary, b
   - $p=0.74\ \mu\text{m}$
   - $N=46000.0$
 
-You may need to search in a area and find geometry that the spoke is clearly visible. If you find a geometry than produces visible spokes (even if heavily distorted), continue to next step.
+You may need to search in a area and find geometry that the spoke is clearly visible. If you find a geometry that produces visible spokes (even if heavily distorted), continue to next step.
 
 ### Coarse Revolution Calibration
 Burn a disc and inspect how many revolutions the spokes have rotated (estimate fractional turns if they are not heavily distorted).
@@ -55,8 +57,6 @@ Remember that our initial $r_0$ was chosen as a nominal value.
 
 Once you have calibrated the geometry, you can optionally calibrate the actual radius. This can be done by limiting the program-area end radius or by direct measurement.
 
-Once you have calibrated the revolution count $N$. You can optionally calibrate for real radius. Here, you can calibrate by limiting program-area end radius or by measurement.
-
 You can also skip this step. The image burned onto the disc might be slightly larger or smaller, but skipping this step does not introduce angular distortion.
 
 #### Limit Program Area End Radius
@@ -70,7 +70,6 @@ The spoke image should include rings at specified radii. For example, choose the
 The scaling factor is $s=\cfrac{r_\text{real}}{55\ \text{mm}}$.
 
 #### Scale the Geometry
-
 Multiply $r_0$ and $p$ by the scaling factor $s$ to obtain the new geometry, keeping $N$ unchanged. If you have residual phase correction samples, scale their radius coordinates by $s$ as well.
 
 ## CD Family
