@@ -1,0 +1,22 @@
+{
+    "disc": {
+        "media_family": "CD",
+        "media_type": "RW",
+        "brand": "Mitsubishi",
+        "description": "Mitsubishi SERL CD-RW 4-12x",
+        "sectors": 359849
+    },
+    "geometry": {
+        "r0" : 24.830758376375062,
+        "pitch" : 1.5001855170532903,
+        "n" : 22110.093216189
+    },
+    "correction_samples": {
+        "radius_mm":      [25.0,  30.0,  35.0,  40.0,   45.0,   50.0,   55.0,  58.0],
+        "correction_deg": [ 0.0, 0.835, 0.373, 0.076, -0.478, -0.403, -0.206,   0.0]
+    },
+    "test_environment": {
+        "drive_model": "HP DVD A DS8ACSH",
+        "test_speed_x": 10
+    }
+}

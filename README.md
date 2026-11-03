@@ -1,6 +1,9 @@
 # discscape
-Renders image into visible patterns on the data side of a CD
 
-This is an independent work and is not affliated with any third party.
+Renders images as visible patterns on the data side of optical discs (currently CD).
 
-This project is currently work in progress and does not provide executable files. But feel free to explore the implementations and try do it yourself.
+This is an independent implementation, not affiliated with any third-party project.
+
+discscape is currently experimental and under development. No prebuilt executables or ready-to-use command-line interface are provided yet.
+
+The source code is available for anyone interested in exploring the implementation or conducting their own experiments.

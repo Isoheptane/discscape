@@ -10,7 +10,7 @@ FILE "disc-art.pcm" BINARY
     INDEX 01 00:00:00
 ```
 
-### CD-ROM (MODE1/2048, MODE1/2356, MODE2/2336)
+### CD-ROM (MODE1/2048, MODE1/2352, MODE2/2336)
 Driver will swap byte pair before forming a F1 frame, use LE (swap) in code, so two swap cancels each other.
 
 If byte order is wrong, double image may appear in 
@@ -26,15 +26,75 @@ FILE "payload.bin" BINARY
 Replace `MODE1/2048` with desired mode.
 
 ## Calibration process
-Sign convention: Clockwise is positive. The calibration process should use an spoke image. 
+Sign convention: When viewed from data side, clockwise is positive. The calibration process should use a spoke image. 
 
-Imagine we are painting a string, and the goal is to let it form a good looking spoke image when it winds back to a spiral.
+### Idea
+Imagine we are painting a string, and the goal is to let it form a good looking spoke image when it winds back to a spiral. The spiral is described by three geometric parameters: start radius ($r_0$), pitch ($p$) and revolutions count ($N$).
 
-Initially, we start with a guessed or good enough geometry $G_{\text{cur}}=\set{r_{0\text{cur}}, p_\text{cur}, N_\text{cur}}$ that is burned into a CD. Then measure the spoke offset from the root (minimal radius) of the visible image on disc. Suppose at radius $r$, spoke is curved with positive phase error $\Delta\theta$, this means that:
+Initially, we start with a guessed or good enough geometry $G_{\text{cur}}=\set{r_{0\text{cur}}, p_\text{cur}, N_\text{cur}}$ that is burned into a CD. Then measure the spoke offset relative to the innermost visible part of the calibration image. Suppose at radius $r$, spoke is curved with positive phase error $\Delta\theta$, this means that:
 - Our current setup does not properly reflect true geometry of the disc
 - At radius $r$, we paint the spoke late for $\Delta\theta$, and we should paint it earlier
 - It means that our image sampling should look ahead for $\Delta\theta$ at radius $r$.
-- Go find the corresponding normalized position at $r$. If at that position old geometry gives unwrapped angle $\theta_{\text{cur}}$, then our new geometry should give $\theta_{\text{new}}$ that ideally makes $\theta_{\text{new}} - \theta_{\text{cur}} = \Delta\theta$, or minimalizes absolute $\theta_{\text{new}} - \theta_{\text{cur}} - \Delta\theta$.
+- Go find the corresponding normalized position at $r$. If at that position old geometry gives unwrapped angle $\theta_{\text{cur}}$, then our new geometry should give $\theta_{\text{new}}$ that ideally makes $\theta_{\text{new}} - \theta_{\text{cur}} = \Delta\theta$, or minimizes the phase residuals across all measure measurement points $\theta_{\text{new}} - \theta_{\text{cur}} - \Delta\theta$.
+
+### Initial Geometry
+To calibrate for a specific disc, you need to guess a geometry first. You can use the geometry of a existing disc, or use conventional values.
+
+We need to fix $r_0$ for initial calibration process. The true value can vary, but fixing a initial $r_0$ makes later jobs easier. Here are some valuses you can reference:
+
+- CD (80 minute)
+  - $r_0=25.00\ \text{mm}$ (True value between 24.80 ~ 25.00 mm)
+  - $p=1.51\ \mu\text{m}$ (True value between 1.5 ~ 1.7 µm)
+  - $N=22110.0$
+- DVD (4.7GB)
+  - $r_0=24.00\ \text{mm}$ (True value between 23.80 ~ 24.00 mm)
+  - $p=0.74\ \mu\text{m}$
+  - $N=46000.0$
+
+You may need to search in a area and find geometry that the spoke is clearly visible. If you find a geometry than produces visible spokes (even if heavily distorted), continue to next step.
+
+### Coarse Revolution Calibration
+Burn a disc and inspect how much turns have the spokes rotate (estimate fractional turns if it's not heavily distorted)
+
+If spokes turns $m$ revolutions in clockwise direction from from inner to outer. It means that our $N$ is too small for real disc, increase $N$ by $m$. If spokes turns in counter-clockwise direction, decrease $N$ by $m$.
+
+Repeat this process until the accumulated spoke rotation error is near zero revolutions.
+
+### Radius Calibration (Optional)
+Remember our initial $r_0$ is chosen as nominal value?
+
+Once you have calibrated the revolution count $N$. You can optionally calibrate for real radius. Here, you can calibrate by limiting program-area end radius or by measurement.
+
+You can also skip this step. The image burned on the disc might be slightly larger or smaller if this step is skipped, but skipping this step does not result in distortion.
+
+#### Limit Program Area end radius
+Calculate the end radius of the geometry: $r_\text{end}=r_0+pN$. If $r_\text{end}$ exceeds 58 mm, we can scale down the whole image.
+
+The scaling factor $s=\cfrac{58\ \text{mm}}{r_\text{end}}$. Use new geometry:
+- $r_0'=sr_0$
+- $p'=sp$
+- $N'=N$
+
+#### Measure and calibrate
+Spoke image should have rings for specified radius. For a example, we choose the ring at 55 mm radius. Manually measure the real radius $r_\text{real}$ at 55 mm radius ring.
+
+The scaling factor $s=\cfrac{r_\text{real}}{55\ \text{mm}}$. Use new geometry:
+- $r_0'=sr_0$
+- $p'=sp$
+- $N'=N$
+
+### Pitch Calibration
+Once revolution count $N$ is calibrated, the remaining distortion mainly comes from incorrect $p$. Which can produce bow shaped distortion as much as a few revolutions.
+
+[ Here we should use a tool for calibration, which gives calibrated p and N, but it is still under construction. Use the method in Idea section. ]
+
+Measure the phase error at different radius, use tool to calculate corrected $p$ and $N$. Burn discs with new geometry. Repeat this process until the spokes follows radial direction. You may still see S shaped distortions, they are residual errors that potentially from
+- Local variation in effective spiral pitch
+- Drive-dependent behavior
+
+Now, geometry is successfully calibrated.
+
+For residual errors, calibrate them with additional phase correction.
 
 ## DVD Family
 
