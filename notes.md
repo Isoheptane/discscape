@@ -72,8 +72,70 @@ The scaling factor is $s=\cfrac{r_\text{real}}{55\ \text{mm}}$.
 #### Scale the Geometry
 Multiply $r_0$ and $p$ by the scaling factor $s$ to obtain the new geometry, keeping $N$ unchanged. If you have residual phase correction samples, scale their radius coordinates by $s$ as well.
 
+
+## Optical Appearance
+The transition density of land and pits affect the angular distribution of reflected light. Recorded patterns remain visible from many view angles, but their brightness may invert depending on the viewing direction and light source directions.
+
+Regions with higher apparent diffusion appear brightly reflective over a broader range of viewing angles. Regions with lower apparent diffusion may exhibit stronger reflections.
+
+The effect may be related to the physical spacing of recorded marks and may contribute to the different luma observed on CD-R and DVD+R media.
+
+### Observed Media Behavior
+
+| Media Type | Higher Apparent Diffusion | Suggested Luma Mapping |
+| :--------- | :------------------------ | :--------------------- |
+| CD-R | High Transition Density | Non-inverted |
+| CD-RW | High Transition Density | Non-inverted |
+| DVD+R | Low Transition Density | Inverted|
+
+- Non-inverted Luma Mapping: High Luma maps to High Transition Density
+- Inverted Luma Mapping: Low Luma maps to High Transition Density
+
+These observations describe the visual appearance of tested media, rather than measured optical scattering properties.
+
+### Tested Media
+- CD-RW - Mitsubishi CD-RW SERL 4-12x
+- CD-R - Verbatim CD-R Digital Vinyl Gold Azo 52x
+- DVD+R - Verbatim DVD+R AZO 16x
+
+### Transition Density Strategies
+#### CD
+The current CD EFM strategy uses two bytes to produce different transition densities.
+
+Assume a CD linear velocity of 1.2m/s and the channel bit rate is 4.322 Mbps, one channel bit (T) ocupies approximately 0.278 μm.
+
+| Density | Byte | EFM Codeword (14 bits) | Transitions per 17T | Average Spacing | Physical Spacing
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| Low  | `0x20` | `00000000100000` | 1 | 8.5T | 2.360 μm |
+| High | `0xAA` | `10010001001001` | 5 | 3.4T | 0.944 μm |
+
+For repeated codewords, the merging bits affect the effective transition density.
+
+#### DVD
+The current DVD EFM+ strategy selects codewords with relatively low or high transition densities depending on the encoder state.
+
+| EFM+ State | Low-Density Byte | High-Density Byte | Transitions (Low / High)|
+| :-- | :-- | :-- | :-- |
+| 1 | `0x5F` | `0x62` | 2 / 5 |
+| 2 | `0x40` | `0x62` | 2 / 5 |
+| 3,4 | `0xB2` | `0x70` | 3 / 6 |
+
+*(Note: This table is selected to ensure that state transitions to state 1 after any 2 daya bytes. State 1 would be dominant.)*
+
+Each EFM+ codeword contains 16 channel bits. At 1x DVD speed, an approximate DVD linear velocity of 3.49 m/s and channel bit rate of 25.502 Mbps, one channel bit (T) occupies approximately 0.137 μm.
+
+| Transition Count | Average Spacing | Physical Spacing |
+| :-- | :-- | :-- |
+| 2 / 16 | 8.00T | 1.094 μm |
+| 3 / 16 | 5.33T | 0.730 μm |
+| 5 / 16 | 3.20T | 0.438 μm |
+| 6 / 16 | 2.67T | 0.365 μm |
+
+The difference in transition spacing may contribute to the observed reflection.
+
 ## CD Family
-### CD-DA Audio Track
+### Modes
+#### CD-DA Audio Track
 Driver won't swap byte pair before forming a F1 frame, use BE (no swap) in code.
 
 Example CUE file:
@@ -84,7 +146,7 @@ FILE "disc-art.pcm" BINARY
     INDEX 01 00:00:00
 ```
 
-### CD-ROM (MODE1/2048, MODE1/2352, MODE2/2336)
+#### CD-ROM (MODE1/2048, MODE1/2352, MODE2/2336)
 Driver will swap byte pair before forming a F1 frame, use LE (swap) in code, so two swap cancels each other.
 
 If byte order is wrong, double image may appear in data side.
@@ -101,6 +163,8 @@ Replace `MODE1/2048` with desired mode.
 
 ## DVD Family
 
+
+## DVD Specifications and Implementations
 ### Data Format
 2048 bytes of main data are transformed successively to
 - Data Frame
