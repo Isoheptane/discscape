@@ -55,12 +55,14 @@ impl SpiralGeometry {
         let length = TAU * rev * (self.r0 + self.p_mm * rev / 2.0);
         return length / self.total_length;
     }
+
     #[allow(unused)]
     pub fn pos_at_rev(&self, rev: f64) -> f64 {
         let theta = rev * TAU;
         let length = theta * (self.r0 + self.p_mm * rev / 2.0);
         return length / self.total_length;
     }
+
     #[allow(unused)]
     pub fn pos_at_theta(&self, theta: f64) -> f64 {
         let rev = theta / TAU;

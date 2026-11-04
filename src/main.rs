@@ -4,6 +4,7 @@ mod geometry;
 mod cd;
 mod dvd;
 mod efmplus;
+mod fitter;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -22,55 +23,35 @@ use crate::picture::{DiscPicture};
 fn main() {
     let start = Instant::now();
 
+    // let geometry = SpiralGeometry::new(
+    //     24.830758376375062, 
+    //     1.5001855170532903, 
+    //     22110.093216189
+    // );
+
     let geometry = SpiralGeometry::new(
-        24.830758376375062, 
-        1.5001855170532903, 
-        22110.093216189
+        24.0,
+        0.7414367253530723,
+        45981.86501395135,
     );
+    println!("{:#?}", geometry);
 
     let samples = vec![
-        PhaseSample { radius_mm: 25.0, correction_deg: 0.0 },
-        PhaseSample { radius_mm: 30.0, correction_deg: 0.835 },
-        PhaseSample { radius_mm: 35.0, correction_deg: 0.373 },
-        PhaseSample { radius_mm: 40.0, correction_deg: 0.076 },
-        PhaseSample { radius_mm: 45.0, correction_deg: -0.478 },
-        PhaseSample { radius_mm: 50.0, correction_deg: -0.403 },
-        PhaseSample { radius_mm: 55.0, correction_deg: -0.206 },
-        PhaseSample { radius_mm: 58.0, correction_deg: 0.0 },
+        PhaseSample { radius_mm: 25.0, correction_deg: -11.1 },
+        PhaseSample { radius_mm: 30.0, correction_deg: -51.8 },
+        PhaseSample { radius_mm: 35.0, correction_deg: -49.6 },
+        PhaseSample { radius_mm: 40.0, correction_deg: -20.7 },
+        PhaseSample { radius_mm: 45.0, correction_deg: 24.0 },
+        PhaseSample { radius_mm: 50.0, correction_deg: 87.9 },
+        PhaseSample { radius_mm: 55.0, correction_deg: 158.2},
+        // PhaseSample { radius_mm: 58.0, correction_deg: 200 },
     ];
 
-    // let linear = PhaseCorrectionSamples::new(samples.clone(), SampleInterpolation::Linear);
-    let pchip = PhaseCorrectionSamples::new(samples.clone(), SampleInterpolation::Pchip);
-
-    let calib = PhaseCorrection::Samples(pchip.clone());
-    let lut = PhaseCorrection::Lut(calib.to_lut(25.0, 58.0, 0.1));
-
-    // for i in 0..100 {
-    //     let p1 = linear.correction_rad(25.0 + 0.1 * i as f64);
-    //     let p2 = pchip.correction_rad(25.0 + 0.1 * i as f64);
-    //     let p3 = lut.correction_rad(25.0 + 0.1 * i as f64);
-    // 
-    //     println!("{p1:.4}, {p2:.4}, {p3:.4}");
-    //     println!("{:.4}, {:.4}", p2 - p1, p3 - p2);
-    // }
-
-    let calib_geometry = CalibratedSpiralGeometry {
-        geometry,
-        phase_correction: Some(lut)
-    };
-
-    let disc = CdDisc::new(calib_geometry, 359849);
-
-    // DVD Codes
-
-    let geometry = SpiralGeometry::new(
-        24.0, 
-        0.74, 
-        46000.0
-    );
+    let calibrated_geometry = fitter::fit(&geometry, &samples, 55.0);
+    println!("{:#?}", calibrated_geometry);
 
     let calib_geo = CalibratedSpiralGeometry {
-        geometry,
+        geometry: calibrated_geometry.unwrap(),
         phase_correction: None
     };
 
@@ -117,12 +98,12 @@ fn main() {
 
         let chunk = dvd::generate_sector(&disc, &picture, &mut rng, sector);
         // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-        writer.write_all(&chunk).expect("Failed to write to writer");
+        // writer.write_all(&chunk).expect("Failed to write to writer");
 
         bar.inc(2048);
 
     }
-    writer.flush().expect("Failed to flush buffer");
+    // writer.flush().expect("Failed to flush buffer");
     bar.finish();
 
     let end = Instant::now();

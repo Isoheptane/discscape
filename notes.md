@@ -6,7 +6,7 @@ The calibration process should use a spoke image.
 ### Idea
 Imagine we are painting a string, and the goal is to let it form a good looking spoke image when it winds back to a spiral. The spiral is described by three geometric parameters: start radius ($r_0$), pitch ($p$) and revolutions count ($N$).
 
-Initially, we start with a guessed or good enough geometry $G_{\text{cur}}=\{r_{0\text{cur}}, p_\text{cur}, N_\text{cur}\}$ that is burned onto a disc. Then measure the spoke offset relative to the innermost visible part of the calibration image. Suppose at radius $r$, spoke is curved with positive phase error $\Delta\theta$, this means that:
+Initially, we start with a guessed or good enough geometry $G_{\text{cur}}=(r_{0\text{cur}}, p_\text{cur}, N_\text{cur})$ that is burned onto a disc. Then measure the spoke offset relative to the innermost visible part of the calibration image. Suppose at radius $r$, spoke is curved with positive phase error $\Delta\theta$, this means that:
 - Our current setup does not properly reflect true geometry of the disc
 - At radius $r$, we paint the spoke late for $\Delta\theta$, and we should paint it earlier
 - It means that our image sampling should look ahead for $\Delta\theta$ at radius $r$.
