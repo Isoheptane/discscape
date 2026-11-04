@@ -6,8 +6,8 @@
     },
     "geometry": {
         "r": 24.0,
-        "pitch": 0.74,
-        "n": 46000
+        "pitch": 0.7414367253530723,
+        "n": 45981.86501395135
     },
     "correction_samples": {
         "radius_mm": [],
@@ -22,7 +22,7 @@
         "recording": {
             "drive": "HP DVD A DS8ACSH",
             "firmware": "LHS3",
-            "speed_x": 8,
+            "speed_x": 6,
             "software": "growisofs",
             "date": "2026-11-03"
         }
