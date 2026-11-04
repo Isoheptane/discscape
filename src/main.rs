@@ -108,7 +108,7 @@ fn main() {
     //     .unwrap()
     //     .progress_chars("##.")
     // );
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} sectors")
+    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}")
         .unwrap()
         .progress_chars("##.")
     );
@@ -127,8 +127,8 @@ fn main() {
 
     let end = Instant::now();
 
-    let ms = end.duration_since(start).as_nanos();
-    println!("Job done in {:.3} seconds", ms as f64 / 1_000_000_000.0)
+    let ns = end.duration_since(start).as_nanos();
+    println!("Job done in {:.3} seconds", ns as f64 / 1_000_000_000.0)
 
     
 }

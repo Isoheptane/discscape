@@ -190,30 +190,34 @@ pub fn generate_sector(
     rng: &mut SmallRng,
     sector_num: usize,
 ) -> [u8; MAIN_DATA_SIZE] {
+
     // Set EFM Plus state machine by 12 bytes
     let mut state = EFMPlusStateMachine::new();
+
     // Sector ID
     state.next(disc.disc_type().default_sector_id_info_byte());
-    let psn = sector_num as u64 + 0x30000;
+    let psn: u64 = sector_num as u64 + 0x30000;
     state.next(((psn >> 16) & 0xFF) as u8);
     state.next(((psn >> 8) & 0xFF) as u8);
     state.next((psn & 0xFF) as u8);
-    // Initialize scramble table
-    let scramble_table = &SCRAMBLE_LUT[((psn >> 4) & 0x0F) as usize];
 
     /*
         TODO: Finish IED Calculation
-        Without IED calculation, the EFM Plus state can not be correctly predicted for first recording frame.
+        Without IED calculation, the EFM Plus state can not be correctly 
+        predicted for first recording frame.
 
         But all bytes are selected for returning to state 1.
-        Ideally state will turn to 1 after 13 bytes (counted from data frame )
-    */
+        The current EFM Plus strategy guarantees that we sync back to state 1
+        in at most 2 controlable bytes. Which is first 2 bytes in main data.
 
+        So I just set IED to 0x00. That's fine, state machine will recover in
+        2 bytes anyway.
+    */
     state.next(0x00);
     state.next(0x00);
     // CPR_MAI
     for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
-    
+
     // Initialize image luma sampling first
     const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
     const IMAGE_SAMPLES_LEN: usize = PHYSICAL_SECTOR_CHANNEL_WORDS as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
@@ -238,6 +242,7 @@ pub fn generate_sector(
     }
     let image_samples = image_samples;
 
+    let scramble_table = &SCRAMBLE_LUT[((psn >> 4) & 0x0F) as usize];
     // Start byte sampling
     let mut chunk = [0u8; MAIN_DATA_SIZE];
 

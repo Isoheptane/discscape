@@ -94,6 +94,11 @@ impl EFMPlusStateMachine {
     }
 
     #[inline]
+    pub fn set(&mut self, state: EFMPlusState) {
+        self.state = state;
+    }
+
+    #[inline]
     pub fn next(&mut self, byte: u8) {
         let idx = EFM_TRANSITIONS[self.state as usize][byte as usize];
 
@@ -129,6 +134,30 @@ impl EFMPlusStrategy {
         [0xB2, 0x70], // State 4
         // 1000000100000010 ; 1001001001001001
     ];
+
+    /*
+        This strategy is designed to
+        - Keep the state on state 1.
+        - Sync incorrectly predicted actual state back to state 1.
+
+        The next state transition table is
+        | Actual State | 0x5F | 0x62 | 0x40 | 0xB2 | 0x70 |
+        |           1  |   1  |   1  |   1  |   1  |   1  |
+        |           2  |   1  |   1  |   1  |   1  |   1  |
+        |           3  |   1  |   2  |   2  |   1  |   1  |
+        |           4  |   1  |   2  |   2  |   1  |   1  |
+
+        Suppose we represent the transition as
+        - (Actual State, Predicted State, Density) -> (Actual State, Predicted State)
+        Even if predicted state is not synced with actual state,
+        - 1: ({1,2}, {1,2,3,4}, {L/H}) -> (1, 1), synced
+        - 2: ({3,4}, {3,4}, {L/H}) -> (1, 1), synced
+        - 3: ({3,4}, 1, L) -> (1, 1), synced
+        - 4: ({3,4}, 1, H) -> (2, 1), not synced, but will sync on next byte
+        - 5: ({3,4}, 2, {L/H}) -> (2, 1), not synced, but will sync on next byte
+        
+        Funky, isn't it? I even didn't notice this.
+    */
 
     #[inline]
     pub const fn choose(state: EFMPlusState, density: TransitionDensity) -> u8 {
