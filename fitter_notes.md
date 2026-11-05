@@ -1,8 +1,6 @@
+## Geometry Definition
 Suppose we have:
 - Current Geometry $G=(r_0, p, N)$
-- Measured points $r_i$ and $\Delta n_i$, where $n_i$ is the revolution count error $\cfrac{\theta}{2\pi}$
-
-We want to minimalize $n_\text{new}-n_\text{cur}-\Delta n_i$ on specific radius.
 
 ### Length of Spiral
 Since $N \gg 1$, we can use concentric circles for total length approximation:
@@ -67,7 +65,7 @@ n&=\sqrt{\cfrac{r_0^2}{p^2}+\cfrac{s(2r_0N+pN^2)}{p}}-\cfrac{r0}{p}
 \end{aligned}
 $$
 
-## Analyze 
+## Local Analysis
 For same normalized position $s$, we can see the radius change be
 
 $$
@@ -133,35 +131,40 @@ $$
 
 ---
 
-Let the geometry delta be $\Delta N$, $\Delta p$. At any normalized position $s$, we have
+Let the geometry delta be $\Delta N$, $\Delta p$. At any normalized position $s$, we can estimate the phase offset at normalized position $s$
 
 $$
 \Delta n(s)\approx \cfrac{\partial n}{\partial N}(s)\cdot \Delta N+\cfrac{\partial n}{\partial p}(s)\cdot \Delta p
 $$
 
+## Calibration Fitting
+For calbration, we have
+- Measured points $r_i$ and $\Delta e_i$, where $e_i$ is the revolution count error $\cfrac{\theta}{2\pi}$ relative to a radius (usually $r_0$ or $r_z$)
 
+For same normalized position $s$, we want make sure $n_\text{new}(s)-n_\text{cur}(s)$ is as close to our measured error as possible.
 
-### Points
-If a pivot point $(r_k, e_k)$ is set, then:
-$$
-\begin{aligned}
-u_k\Delta N+v_k\Delta p=\Delta n_k \\
-\Delta N = \cfrac{e_k - v_k\Delta p}{u_k}
-\end{aligned}
-$$
+Every radius in measured errors and base points should be converted to normalized position:
+- $r_i\to s_i$
+- $r_z\to s_z$
 
-For minimal error:
-$$
-\sum_{i=1}^M (u_i\Delta N+v_i\Delta p-e_i)^2
-$$
+A normalized position (with fixed sector size) also represents a position in generated data. What we are adjusting is the phase offset at that position.
 
-For any other points
+### Absolute Angle
 
+This method assumes $\Delta e_i$ is measured relative to root radius $r_0$.
+
+For minimal error, we want to minimalize $\Delta n(s_i)-e_i$, the target is to minimalize
 $$
-\begin{aligned}
-e_i&=u_i\Delta N + v_i\Delta p \\
-e_i&=u_i\left(\cfrac{e_k - v_k\Delta p}{u_k}\right) + v_i\Delta p \\
-e_i&=\cfrac{u_i}{u_k}e_k +\left( v_i-\cfrac{u_i v_k}{u_k} \right)\Delta p \\
-\end{aligned}
+\sum_{i=1}(\Delta n(s_i)-e_i)^2
 $$
 
+### Relative Angle
+
+This method assumes $\Delta e_i$ is measured relative to a measure radius $r_z$.
+
+Phase offset affects both measure base radius and other measure points.
+
+For minimal error, we want to minimalize $\Delta n(s_i)-\Delta n(s_z)-e_i$, the target is to minimalize
+$$
+\sum_{i=1}(\Delta n(s_i)-\Delta n(s_z)-e_i)^2
+$$

@@ -70,7 +70,7 @@ impl SpiralGeometry {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PhaseSample {
     pub radius_mm: f64,
-    pub correction_deg: f64
+    pub correction_rev: f64
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -81,12 +81,12 @@ pub enum SampleInterpolation {
 
 /// Use phase samples with interpolation for correction
 #[derive(Debug, Clone, PartialEq)]
-pub struct PhaseCorrectionSamples {
+pub struct PhaseCorrectionInterpolation {
     pub samples: Vec<PhaseSample>,
     pub interpolation: SampleInterpolation
 }
 
-impl PhaseCorrectionSamples {
+impl PhaseCorrectionInterpolation {
 
     #[inline]
     fn linear(&self, radius_mm: f64) -> f64 {
@@ -94,16 +94,15 @@ impl PhaseCorrectionSamples {
         if samples.is_empty() { return 0.0; }
         let i = samples.partition_point(|v| v.radius_mm < radius_mm);
         if i == 0 {
-            return samples[0].correction_deg / 360.0;
+            return samples[0].correction_rev;
         }
         if i == samples.len() {
-            return samples[i - 1].correction_deg / 360.0;
+            return samples[i - 1].correction_rev;
         }
         let a = samples[i - 1];
         let b = samples[i];
         let t = (radius_mm - a.radius_mm) / (b.radius_mm - a.radius_mm);
-        let degrees = a.correction_deg + t * (b.correction_deg - a.correction_deg);
-        degrees / 360.0
+        a.correction_rev + t * (b.correction_rev - a.correction_rev)
     }
 
     #[inline]
@@ -114,16 +113,16 @@ impl PhaseCorrectionSamples {
         }
         let i = samples.partition_point(|v| v.radius_mm < radius_mm);
         if i == 0 {
-            return samples[0].correction_deg / 360.0;
+            return samples[0].correction_rev;
         }
         if i == samples.len() {
-            return samples[i - 1].correction_deg / 360.0;
+            return samples[i - 1].correction_rev;
         }
         
         let x0 = samples[i - 1].radius_mm;
         let x1 = samples[i].radius_mm;
-        let y0 = samples[i - 1].correction_deg / 360.0;
-        let y1 = samples[i].correction_deg / 360.0;
+        let y0 = samples[i - 1].correction_rev;
+        let y1 = samples[i].correction_rev;
         let h = x1 - x0;
         let t = (radius_mm - x0) / h;
 
@@ -132,7 +131,7 @@ impl PhaseCorrectionSamples {
         }
 
         let secant = |j: usize| -> f64 {
-            (samples[j + 1].correction_deg - samples[j].correction_deg) / 360.0 /
+            (samples[j + 1].correction_rev - samples[j].correction_rev) /
             (samples[j + 1].radius_mm - samples[j].radius_mm)
         };
 
@@ -229,7 +228,7 @@ impl PhaseCorrectionLut {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhaseCorrection {
-    Samples(PhaseCorrectionSamples),
+    Samples(PhaseCorrectionInterpolation),
     Lut(PhaseCorrectionLut),
 }
 

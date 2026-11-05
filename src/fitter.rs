@@ -1,7 +1,7 @@
 use crate::geometry::{PhaseSample, SpiralGeometry};
 
 /*
-    Seriously
+    Seriously I can't read this piece of code.
 */
 
 pub fn fit(cur: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) -> Option<SpiralGeometry> {
@@ -13,7 +13,7 @@ pub fn fit(cur: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) ->
 
     let (x_list, base_err): (Vec<f64>, Vec<f64>) = error.into_iter()
         .map(|s| 
-            (cur.pos_at_radius(s.radius_mm), s.correction_deg / 360.0)
+            (cur.pos_at_radius(s.radius_mm), s.correction_rev)
         )
         .unzip();
 
