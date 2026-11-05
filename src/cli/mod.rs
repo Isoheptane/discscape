@@ -1,0 +1,30 @@
+mod render;
+mod profile;
+
+use clap::{Parser, Subcommand};
+
+use profile::ProfileCommands;
+
+use crate::cli::profile::profile_command;
+
+#[derive(Parser)]
+#[command(version, about)]
+pub struct Cli {
+    #[command(subcommand)]    
+    pub command: Command,
+}
+
+#[derive(Subcommand)]
+pub enum Command {
+    #[command(subcommand)]    
+    Render,
+    #[command(subcommand)]    
+    Profile(ProfileCommands),
+}
+
+pub fn run(cli: Cli) {
+    match cli.command {
+        Command::Render => todo!(),
+        Command::Profile(profile_commands) => profile_command(profile_commands),
+    }
+}

@@ -1,8 +1,11 @@
+mod cli;
+
 use std::f64::consts::TAU;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::time::Instant;
 
+use clap::Parser;
 use image::ImageReader;
 use image::codecs::pnm::ArbitraryTuplType::Grayscale;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -15,6 +18,11 @@ use discscape::cd::CdDisc;
 use discscape::picture::{DiscPicture};
 
 fn main() {
+
+    cli::run(cli::Cli::parse());
+
+    return;
+
     let start = Instant::now();
 
     /*
@@ -36,41 +44,41 @@ fn main() {
     println!("{:#?}", geometry);
 
     let samples = vec![
-            PhaseSample { radius_mm: 24.0, correction_rev: 0.000000 },
-            PhaseSample { radius_mm: 25.0, correction_rev: 0.001656 },
-            PhaseSample { radius_mm: 26.0, correction_rev: 0.002335 },
-            PhaseSample { radius_mm: 27.0, correction_rev: 0.003075 },
-            PhaseSample { radius_mm: 28.0, correction_rev: 0.003171 },
-            PhaseSample { radius_mm: 29.0, correction_rev: 0.003207 },
-            PhaseSample { radius_mm: 30.0, correction_rev: 0.002900 },
-            PhaseSample { radius_mm: 31.0, correction_rev: 0.002614 },
-            PhaseSample { radius_mm: 32.0, correction_rev: 0.002237 },
-            PhaseSample { radius_mm: 33.0, correction_rev: 0.001781 },
-            PhaseSample { radius_mm: 34.0, correction_rev: 0.002115 },
-            PhaseSample { radius_mm: 35.0, correction_rev: 0.001585 },
-            PhaseSample { radius_mm: 36.0, correction_rev: 0.001226 },
-            PhaseSample { radius_mm: 37.0, correction_rev: 0.000576 },
-            PhaseSample { radius_mm: 38.0, correction_rev: 0.000070 },
-            PhaseSample { radius_mm: 39.0, correction_rev: 0.000263 },
-            PhaseSample { radius_mm: 40.0, correction_rev: 0.000730 },
-            PhaseSample { radius_mm: 41.0, correction_rev: 0.001202 },
-            PhaseSample { radius_mm: 42.0, correction_rev: 0.001685 },
-            PhaseSample { radius_mm: 43.0, correction_rev: 0.001934 },
-            PhaseSample { radius_mm: 44.0, correction_rev: 0.002042 },
-            PhaseSample { radius_mm: 45.0, correction_rev: 0.002098 },
-            PhaseSample { radius_mm: 46.0, correction_rev: 0.002308 },
-            PhaseSample { radius_mm: 47.0, correction_rev: 0.002380 },
-            PhaseSample { radius_mm: 48.0, correction_rev: 0.002399 },
-            PhaseSample { radius_mm: 49.0, correction_rev: 0.002294 },
-            PhaseSample { radius_mm: 50.0, correction_rev: 0.002189 },
-            PhaseSample { radius_mm: 51.0, correction_rev: 0.002105 },
-            PhaseSample { radius_mm: 52.0, correction_rev: 0.001974 },
-            PhaseSample { radius_mm: 53.0, correction_rev: 0.001620 },
-            PhaseSample { radius_mm: 54.0, correction_rev: 0.001326 },
-            PhaseSample { radius_mm: 55.0, correction_rev: 0.000953 },
-            PhaseSample { radius_mm: 56.0, correction_rev: 0.000510 },
-            PhaseSample { radius_mm: 57.0, correction_rev: 0.000045 },
-            PhaseSample { radius_mm: 58.0, correction_rev: 0.000000 },
+            PhaseSample { radius_mm: 24.0, correction_rev:  0.000000 },
+            PhaseSample { radius_mm: 25.0, correction_rev:  0.001656 },
+            PhaseSample { radius_mm: 26.0, correction_rev:  0.002335 },
+            PhaseSample { radius_mm: 27.0, correction_rev:  0.003075 },
+            PhaseSample { radius_mm: 28.0, correction_rev:  0.003171 },
+            PhaseSample { radius_mm: 29.0, correction_rev:  0.003207 },
+            PhaseSample { radius_mm: 30.0, correction_rev:  0.002900 },
+            PhaseSample { radius_mm: 31.0, correction_rev:  0.002614 },
+            PhaseSample { radius_mm: 32.0, correction_rev:  0.002237 },
+            PhaseSample { radius_mm: 33.0, correction_rev:  0.001781 },
+            PhaseSample { radius_mm: 34.0, correction_rev:  0.002115 },
+            PhaseSample { radius_mm: 35.0, correction_rev:  0.001585 },
+            PhaseSample { radius_mm: 36.0, correction_rev:  0.001226 },
+            PhaseSample { radius_mm: 37.0, correction_rev:  0.000576 },
+            PhaseSample { radius_mm: 38.0, correction_rev:  0.000070 },
+            PhaseSample { radius_mm: 39.0, correction_rev: -0.000263 },
+            PhaseSample { radius_mm: 40.0, correction_rev: -0.000730 },
+            PhaseSample { radius_mm: 41.0, correction_rev: -0.001202 },
+            PhaseSample { radius_mm: 42.0, correction_rev: -0.001685 },
+            PhaseSample { radius_mm: 43.0, correction_rev: -0.001934 },
+            PhaseSample { radius_mm: 44.0, correction_rev: -0.002042 },
+            PhaseSample { radius_mm: 45.0, correction_rev: -0.002098 },
+            PhaseSample { radius_mm: 46.0, correction_rev: -0.002308 },
+            PhaseSample { radius_mm: 47.0, correction_rev: -0.002380 },
+            PhaseSample { radius_mm: 48.0, correction_rev: -0.002399 },
+            PhaseSample { radius_mm: 49.0, correction_rev: -0.002294 },
+            PhaseSample { radius_mm: 50.0, correction_rev: -0.002189 },
+            PhaseSample { radius_mm: 51.0, correction_rev: -0.002105 },
+            PhaseSample { radius_mm: 52.0, correction_rev: -0.001974 },
+            PhaseSample { radius_mm: 53.0, correction_rev: -0.001620 },
+            PhaseSample { radius_mm: 54.0, correction_rev: -0.001326 },
+            PhaseSample { radius_mm: 55.0, correction_rev: -0.000953 },
+            PhaseSample { radius_mm: 56.0, correction_rev: -0.000510 },
+            PhaseSample { radius_mm: 57.0, correction_rev:  0.000045 },
+            PhaseSample { radius_mm: 58.0, correction_rev: -0.000000 },
     ];
 
     let correction = PhaseCorrectionInterpolation {

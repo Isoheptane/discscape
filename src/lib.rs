@@ -8,3 +8,5 @@ pub mod fitter;
 
 pub mod cd;
 pub mod dvd;
+
+pub mod profile;
