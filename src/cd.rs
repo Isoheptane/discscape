@@ -37,14 +37,12 @@ pub const F1_TO_F3_DELAY_LUT: [i64; F1_FRAME_SIZE_BYTES] = [
 ];
 
 /// The mapping table for F3 to F1 frame mapping; .0 is position de-map and .1 is delay frame count
-#[allow(unused)]
 pub const F3_TO_F1_POS_LUT: [u8; F1_FRAME_SIZE_BYTES] = [
      0,  1,  8,  9, 16, 17,  2,  3,
     10, 11, 18, 19,  4,  5, 12, 13,
     20, 21,  6,  7, 14, 15, 22, 23,
 ];
 
-#[allow(unused)]
 pub const F3_TO_F1_DELAY_LUT: [i64; F1_FRAME_SIZE_BYTES] = [
       3,   6,  11,  14,  19,  22,  27,  30,
      35,  38,  43,  46,  65,  68,  73,  76,
@@ -83,7 +81,7 @@ fn f1_to_f3(pos: FramePosition) -> Option<FramePosition> {
 }
 
 /// Maps F3 frame to F1 frame position
-#[allow(unused)]
+#[allow(dead_code)]
 fn f3_to_f1(pos: FramePosition) -> Option<FramePosition> {
     let (frame, byte) = pos;
     let &pos = F3_TO_F1_POS_LUT.get(byte as usize)?;
@@ -99,7 +97,6 @@ fn be_bin_to_f3(idx: u64) -> Option<FramePosition> {
     f1_to_f3((frame, byte))
 }
 
-#[allow(unused)]
 fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
     let frame = (idx / F1_FRAME_SIZE_BYTES as u64) as i64;
     let byte = ((idx % F1_FRAME_SIZE_BYTES as u64) as u8) ^ 1;
@@ -107,7 +104,7 @@ fn le_bin_to_f3(idx: u64) -> Option<FramePosition> {
     f1_to_f3((frame, byte))
 }
 
-#[allow(unused)]
+#[allow(dead_code)]
 fn f3_to_be_bin(pos: FramePosition) -> Option<u64> {
     let (frame, byte) = f3_to_f1(pos)?;
     u64::try_from(frame).ok()?
@@ -115,7 +112,7 @@ fn f3_to_be_bin(pos: FramePosition) -> Option<u64> {
         .checked_add(byte as u64)
 }
 
-#[allow(unused)]
+#[allow(dead_code)]
 fn f3_to_le_bin(pos: FramePosition) -> Option<u64> {
     let (frame, byte) = f3_to_f1(pos)?;
     u64::try_from(frame).ok()?
@@ -148,10 +145,9 @@ impl CdDisc {
         }
     }
 
-    #[inline] #[allow(unused)] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
-    #[inline] #[allow(unused)] pub fn sectors(&self) -> u64 { self.capacity_sectors }
+    #[inline] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
+    #[inline] pub fn sectors(&self) -> u64 { self.capacity_sectors }
 
-    #[allow(unused)]
     pub fn from_cdpaint (
         r0: f64,
         tr0: f64,
@@ -197,7 +193,6 @@ impl CdDisc {
         self.f3_to_polar_coord(be_bin_to_f3(index)?)
     }
 
-    #[allow(unused)]
     pub fn le_bin_to_polar_coord(&self, index: u64) -> Option<PolarCoord> {
         self.f3_to_polar_coord(le_bin_to_f3(index)?)
     }
@@ -227,7 +222,6 @@ fn sample_image_luma(
 }
 
 /// Generates a full audio sector
-#[allow(unused)]
 pub fn generate_audio_chunk(
     disc: &CdDisc,
     image: &DiscPicture,
@@ -250,7 +244,6 @@ pub fn generate_audio_chunk(
 }
 
 /// Generates a RAW MODE1/2352 chunk, but L-EC information is filled with image data
-#[allow(unused)]
 pub fn generate_mode1_2352_chunk(
     disc: &CdDisc,
     image: &DiscPicture,
@@ -283,7 +276,6 @@ pub fn generate_mode1_2352_chunk(
 }
 
 /// Generates a RAW MODE1/2048 chunk
-#[allow(unused)]
 pub fn generate_mode1_2048_chunk(
     disc: &CdDisc,
     image: &DiscPicture,
@@ -306,7 +298,6 @@ pub fn generate_mode1_2048_chunk(
 }
 
 /// Generates a RAW MODE2/2336 chunk
-#[allow(unused)]
 pub fn generate_mode2_2336_chunk(
     disc: &CdDisc,
     image: &DiscPicture,

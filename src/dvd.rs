@@ -1,6 +1,7 @@
-use rand::{RngExt, rngs::SmallRng};
-
-use crate::{efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity}, geometry::{CalibratedSpiralGeometry, PolarCoord}, picture::DiscPicture};
+use crate::picture::DiscPicture;
+use crate::geometry::{CalibratedSpiralGeometry, PolarCoord};
+use crate::efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity};
+use crate::dither::Dither;
 
 
 pub const MAIN_DATA_SIZE: usize         = 2048;
@@ -175,9 +176,9 @@ impl DvdDisc {
         }
     }
 
-    #[inline] #[allow(unused)] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
-    #[inline] #[allow(unused)] pub fn disc_type(&self) -> &DvdDiscType { &self.disc_type }
-    #[inline] #[allow(unused)] pub fn sectors(&self) -> u64 { self.capacity_sectors }
+    #[inline] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
+    #[inline] pub fn disc_type(&self) -> &DvdDiscType { &self.disc_type }
+    #[inline] pub fn sectors(&self) -> u64 { self.capacity_sectors }
 
     pub fn channel_word_to_polar_coord(&self, pos: u64) -> PolarCoord {
         self.geometry.polar_at_pos(pos as f64 * self.inv_total_channel_words)
@@ -187,7 +188,7 @@ impl DvdDisc {
 pub fn generate_sector(
     disc: &DvdDisc,
     image: &DiscPicture,
-    rng: &mut SmallRng,
+    dither: &Dither,
     sector_num: usize,
 ) -> [u8; MAIN_DATA_SIZE] {
 
@@ -203,8 +204,7 @@ pub fn generate_sector(
 
     /*
         TODO: Finish IED Calculation
-        Without IED calculation, the EFM Plus state can not be correctly 
-        predicted for first recording frame.
+        Without IED calculation, the EFM Plus state can not be predicted correctly for first recording frame.
 
         But all bytes are selected for returning to state 1.
         The current EFM Plus strategy guarantees that we sync back to state 1
@@ -255,7 +255,7 @@ pub fn generate_sector(
         }
 
         let luma = image_samples[channel_word as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE];
-        let next_byte = if rng.random_ratio(luma as u32, 255) {
+        let next_byte =  if dither.dither(luma, sector_num as u64 * MAIN_DATA_SIZE as u64 + i as u64) {
             EFMPlusStrategy::choose(state.state(), TransitionDensity::HighDensity)
         } else {
             EFMPlusStrategy::choose(state.state(), TransitionDensity::LowDensity)

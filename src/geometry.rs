@@ -24,13 +24,12 @@ impl SpiralGeometry {
         Self { r0: r0_mm, p: p_um, n: rev, p_mm, total_length }
     }
 
-    #[inline] #[allow(unused)] pub fn r0_mm(&self) -> f64 { self.r0 }
-    #[inline] #[allow(unused)] pub fn pitch_um(&self) -> f64 { self.p }
-    #[inline] #[allow(unused)] pub fn pitch_mm(&self) -> f64 { self.p_mm }
-    #[inline] #[allow(unused)] pub fn revolutions(&self) -> f64 { self.n }
-    #[inline] #[allow(unused)] pub fn total_length(&self) -> f64 { self.total_length }
+    #[inline] pub fn r0_mm(&self) -> f64 { self.r0 }
+    #[inline] pub fn pitch_um(&self) -> f64 { self.p }
+    #[inline] pub fn pitch_mm(&self) -> f64 { self.p_mm }
+    #[inline] pub fn revolutions(&self) -> f64 { self.n }
+    #[inline] pub fn total_length(&self) -> f64 { self.total_length }
 
-    #[allow(unused)]
     pub fn outer_radius_mm(&self) -> f64 {
         self.r0 + (self.n * self.p / 1000.0)
     }
@@ -49,21 +48,18 @@ impl SpiralGeometry {
         (radius_mm, rev)
     }
 
-    #[allow(unused)]
     pub fn pos_at_radius(&self, radius: f64) -> f64 {
         let rev = (radius - self.r0) / self.p_mm;
         let length = TAU * rev * (self.r0 + self.p_mm * rev / 2.0);
         return length / self.total_length;
     }
 
-    #[allow(unused)]
     pub fn pos_at_rev(&self, rev: f64) -> f64 {
         let theta = rev * TAU;
         let length = theta * (self.r0 + self.p_mm * rev / 2.0);
         return length / self.total_length;
     }
 
-    #[allow(unused)]
     pub fn pos_at_theta(&self, theta: f64) -> f64 {
         let rev = theta / TAU;
         let length = theta * (self.r0 + self.p_mm * rev / 2.0);
@@ -77,7 +73,6 @@ pub struct PhaseSample {
     pub correction_deg: f64
 }
 
-#[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SampleInterpolation {
     Linear,

@@ -93,6 +93,7 @@ impl EFMPlusStateMachine {
         self.state = EFMPlusState::State1
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn set(&mut self, state: EFMPlusState) {
         self.state = state;
