@@ -51,10 +51,6 @@ pub struct RenderArgs {
     /// Invert image brightness
     #[arg(long, short = 'i')]
     pub invert: bool,
-    
-    /// Overwrite the destination file if it already exists
-    #[arg(long)]
-    pub overwrite: bool,
 }
 
 pub fn render_command(args: RenderArgs) {
@@ -109,19 +105,10 @@ pub fn render_command(args: RenderArgs) {
 
     let inner: Box<dyn Write> = if &args.output == "-" {
         Box::new(std::io::stdout().lock())
-    } else if 
-        !std::fs::exists(&args.output).expect("Failed to check file exist") 
-        || args.overwrite {
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(args.overwrite)
-            .create_new(!args.overwrite)
-            .open(args.output)
-            .expect("Can't open file or output");
-        Box::new(file)
     } else {
-        panic!("File already exists")
+        let file = File::create(args.output).expect("Can't open file or output");
+
+        Box::new(file)
     };
     let mut writer = BufWriter::with_capacity(1024 * 1024, inner);
 
@@ -192,9 +179,9 @@ fn render_sectors<W, F, const N: usize>(
 {
     let bar = ProgressBar::new((end_sector - start_sector) * N as u64);
 
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}")
+    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}, ETA: {eta:>3}")
         .unwrap()
-        .progress_chars("##.")
+        .progress_chars("#>.")
     );
 
     for sector in start_sector..end_sector {
