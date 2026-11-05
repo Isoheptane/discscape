@@ -1,6 +1,6 @@
 # discscape
 
-Renders images as visible patterns on the data side of optical discs (currently CD).
+Renders images as visible patterns on the data side of optical discs (CD and DVD).
 
 This is an independent implementation, not affiliated with any third-party project.
 
