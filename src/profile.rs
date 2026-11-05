@@ -19,6 +19,18 @@ impl fmt::Display for DiscFamily {
     }
 }
 
+impl From<DiscType> for DiscFamily {
+    fn from(value: DiscType) -> Self {
+        match value {
+            DiscType::CdR | DiscType::CdRw => DiscFamily::Cd,
+            DiscType::DvdMinusR
+            | DiscType::DvdPlusR 
+            | DiscType::DvdMinusRw
+            | DiscType::DvdPlusRw => DiscFamily::Dvd
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiscType {
     #[serde(rename = "CD-R")]
@@ -50,7 +62,6 @@ impl fmt::Display for DiscType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DiscInfo {
-    pub family: DiscFamily,
     #[serde(rename = "type")]
     pub disc_type: DiscType,
     pub capacity_sectors: u64

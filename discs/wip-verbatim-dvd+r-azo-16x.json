@@ -1,6 +1,5 @@
 {
     "disc": {
-        "family": "DVD",
         "type": "DVD+R",
         "capacity_sectors": 2295104
     },

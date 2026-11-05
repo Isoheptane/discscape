@@ -1,4 +1,4 @@
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{BufWriter, Write};
 
 use anyhow::Context;
@@ -138,7 +138,7 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
 
     let dither = Dither::splitmix64(args.seed.unwrap_or(0x114514));
 
-    match disc.family {
+    match DiscFamily::from(disc.disc_type) {
         DiscFamily::Cd => {
             let format = args.format.ok_or(RenderError::MissingCdFormat)?;
             let disc = CdDisc::new(geometry, disc.capacity_sectors);

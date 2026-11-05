@@ -1,6 +1,5 @@
 {
     "disc": {
-        "family": "CD",
         "type": "CD-RW",
         "capacity_sectors": 359849
     },
