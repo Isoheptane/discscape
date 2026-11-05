@@ -1,10 +1,10 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 
 use clap::Args;
-use discscape::cd::CdDisc;
+use discscape::cd::{self, CdDisc};
 use discscape::dither::Dither;
-use discscape::dvd::DvdDisc;
+use discscape::dvd::{self, DvdDisc};
 use discscape::profile::{CorrectionProfile, DiscFamily, DiscProfile};
 use discscape::picture::DiscPicture;
 use discscape::geometry::{CalibratedSpiralGeometry, PhaseCorrection, PhaseCorrectionInterpolation, PhaseSample, SpiralGeometry};
@@ -65,8 +65,8 @@ pub fn render_command(args: RenderArgs) {
     let end_sector = args.end_sector.unwrap_or(profile.disc.capacity_sectors);
 
     // Replace this to more friendly error later
-    assert!(end_sector > start_sector);
-    assert!(end_sector - start_sector <= profile.disc.capacity_sectors);
+    assert!(start_sector < end_sector);
+    assert!(end_sector <= profile.disc.capacity_sectors);
 
     if profile.disc.family == DiscFamily::Cd && args.format.is_none() {
         // Replace this to more friendly error later
@@ -112,7 +112,12 @@ pub fn render_command(args: RenderArgs) {
     } else if 
         !std::fs::exists(&args.output).expect("Failed to check file exist") 
         || args.overwrite {
-        let file = File::create(args.output)
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(args.overwrite)
+            .create_new(!args.overwrite)
+            .open(args.output)
             .expect("Can't open file or output");
         Box::new(file)
     } else {
@@ -129,16 +134,32 @@ pub fn render_command(args: RenderArgs) {
     }
     let picture = DiscPicture::new(grayscale);
 
-    let dither = Dither::splitmix64(0x114514);
+    let dither = Dither::splitmix64(args.seed.unwrap_or(0x114514));
 
     match profile.disc.family {
         DiscFamily::Cd => {
             let disc = CdDisc::new(geometry, profile.disc.capacity_sectors);
             match args.format.unwrap() {
-                CdFormat::Audio => cd_render_audio(&disc, &picture, &dither, start_sector, end_sector, &mut writer),
-                CdFormat::Mode1_2352 => cd_render_mode1_2352(&disc, &picture, &dither, start_sector, end_sector, &mut writer),
-                CdFormat::Mode1_2048 => cd_render_mode1_2048(&disc, &picture, &dither, start_sector, end_sector, &mut writer),
-                CdFormat::Mode2_2336 => cd_render_mode2_2336(&disc, &picture, &dither, start_sector, end_sector, &mut writer),
+                CdFormat::Audio => {
+                    render_sectors(&mut writer, start_sector, end_sector, |i|
+                        cd::generate_audio_chunk(&disc, &picture, &dither, i)
+                    );
+                }
+                CdFormat::Mode1_2352 => {
+                    render_sectors(&mut writer, start_sector, end_sector, |i|
+                        cd::generate_mode1_2352_chunk(&disc, &picture, &dither, i)
+                    );
+                }
+                CdFormat::Mode1_2048 => {
+                    render_sectors(&mut writer, start_sector, end_sector, |i|
+                        cd::generate_mode1_2048_chunk(&disc, &picture, &dither, i)
+                    );
+                }
+                CdFormat::Mode2_2336 => {
+                    render_sectors(&mut writer, start_sector, end_sector, |i|
+                        cd::generate_mode2_2336_chunk(&disc, &picture, &dither, i)
+                    );
+                }
             }
         },
         DiscFamily::Dvd => {
@@ -152,21 +173,24 @@ pub fn render_command(args: RenderArgs) {
             };
             let disc = DvdDisc::new(geometry, disc_type, profile.disc.capacity_sectors);
 
-            dvd_render(&disc, &picture, &dither, start_sector, end_sector, &mut writer);
+            render_sectors(&mut writer, start_sector, end_sector, |i|
+                dvd::generate_sector(&disc, &picture, &dither, i)
+            );
         },
     }
 
 }
 
-fn dvd_render(
-    disc: &DvdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
+fn render_sectors<W, F, const N: usize>(
+    writer: &mut W,
     start_sector: u64,
     end_sector: u64,
-    writer: &mut BufWriter<Box<dyn Write>>,
-) {
-    let bar = ProgressBar::new((end_sector - start_sector) * 2048);
+    mut generate: F,
+) where
+    W: Write,
+    F: FnMut(usize) -> [u8; N],
+{
+    let bar = ProgressBar::new((end_sector - start_sector) * N as u64);
 
     bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}")
         .unwrap()
@@ -174,114 +198,10 @@ fn dvd_render(
     );
 
     for sector in start_sector..end_sector {
-        let chunk = discscape::dvd::generate_sector(disc, picture, dither, sector as usize);
+        let chunk = generate(sector as usize);
         // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
         writer.write_all(&chunk).expect("Failed to write to writer");
-        bar.inc(2048);
-    }
-    
-    writer.flush().expect("Failed to flush buffer");
-    bar.finish();
-}
-
-fn cd_render_audio(
-    disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
-    start_sector: u64,
-    end_sector: u64,
-    writer: &mut BufWriter<Box<dyn Write>>,
-) {
-    let bar = ProgressBar::new((end_sector - start_sector) * 2352);
-
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}")
-        .unwrap()
-        .progress_chars("##.")
-    );
-
-    for sector in start_sector..end_sector {
-        let chunk = discscape::cd::generate_audio_chunk(disc, picture, dither, sector as usize);
-        // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-        writer.write_all(&chunk).expect("Failed to write to writer");
-        bar.inc(2352);
-    }
-    
-    writer.flush().expect("Failed to flush buffer");
-    bar.finish();
-}
-
-fn cd_render_mode1_2352(
-    disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
-    start_sector: u64,
-    end_sector: u64,
-    writer: &mut BufWriter<Box<dyn Write>>,
-) {
-    let bar = ProgressBar::new((end_sector - start_sector) * 2352);
-
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}")
-        .unwrap()
-        .progress_chars("##.")
-    );
-
-    for sector in start_sector..end_sector {
-        let chunk = discscape::cd::generate_mode1_2352_chunk(disc, picture, dither, sector as usize);
-        // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-        writer.write_all(&chunk).expect("Failed to write to writer");
-        bar.inc(2352);
-    }
-    
-    writer.flush().expect("Failed to flush buffer");
-    bar.finish();
-}
-
-fn cd_render_mode1_2048(
-    disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
-    start_sector: u64,
-    end_sector: u64,
-    writer: &mut BufWriter<Box<dyn Write>>,
-) {
-    let bar = ProgressBar::new((end_sector - start_sector) * 2048);
-
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}")
-        .unwrap()
-        .progress_chars("##.")
-    );
-
-    for sector in start_sector..end_sector {
-        let chunk = discscape::cd::generate_mode1_2048_chunk(disc, picture, dither, sector as usize);
-        // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-        writer.write_all(&chunk).expect("Failed to write to writer");
-        bar.inc(2048);
-    }
-    
-    writer.flush().expect("Failed to flush buffer");
-    bar.finish();
-}
-
-fn cd_render_mode2_2336(
-    disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
-    start_sector: u64,
-    end_sector: u64,
-    writer: &mut BufWriter<Box<dyn Write>>,
-) {
-    let bar = ProgressBar::new((end_sector - start_sector) * 2336);
-
-    bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}")
-        .unwrap()
-        .progress_chars("##.")
-    );
-
-    for sector in start_sector..end_sector {
-        let chunk = discscape::cd::generate_mode2_2336_chunk(disc, picture, dither, sector as usize);
-        // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-        writer.write_all(&chunk).expect("Failed to write to writer");
-        bar.inc(2336);
+        bar.inc(N as u64);
     }
     
     writer.flush().expect("Failed to flush buffer");
