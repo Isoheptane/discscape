@@ -1,5 +1,4 @@
-use rand::{RngExt, rngs::SmallRng};
-
+use crate::dither::Dither;
 use crate::picture::DiscPicture;
 use crate::geometry::{CalibratedSpiralGeometry, PolarCoord, SpiralGeometry};
 
@@ -225,7 +224,7 @@ fn sample_image_luma(
 pub fn generate_audio_chunk(
     disc: &CdDisc,
     image: &DiscPicture,
-    rng: &mut SmallRng,
+    dither: &Dither,
     sector_num: usize,
 ) -> [u8; AUDIO_CHUNK_SIZE] {
     let mut chunk = [0; AUDIO_CHUNK_SIZE];
@@ -233,11 +232,11 @@ pub fn generate_audio_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..AUDIO_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64, false);
-        if rng.random_ratio(luma as u32, 255) {
-            chunk[i] = EFM_BYTE_DENSITY_HIGH;
+        if dither.dither(luma, sector_num as u64 * AUDIO_CHUNK_SIZE as u64 + i as u64) {
+            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {
-            chunk[i] = EFM_BYTE_DENSITY_LOW;
-        }
+            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
+        };
     }
 
     chunk
@@ -247,7 +246,7 @@ pub fn generate_audio_chunk(
 pub fn generate_mode1_2352_chunk(
     disc: &CdDisc,
     image: &DiscPicture,
-    rng: &mut SmallRng,
+    dither: &Dither,
     sector_num: usize,
 ) -> [u8; MODE1_2352_CHUNK_SIZE] {
     let mut chunk = [0; MODE1_2352_CHUNK_SIZE];
@@ -265,11 +264,11 @@ pub fn generate_mode1_2352_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 16..MODE1_2352_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64, true);
-        if rng.random_ratio(luma as u32, 255) {
-            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i - 12];
+        if dither.dither(luma, sector_num as u64 * MODE1_2352_CHUNK_SIZE as u64 + i as u64) {
+            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {
-            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i - 12];
-        }
+            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
+        };
     }
 
     chunk
@@ -279,7 +278,7 @@ pub fn generate_mode1_2352_chunk(
 pub fn generate_mode1_2048_chunk(
     disc: &CdDisc,
     image: &DiscPicture,
-    rng: &mut SmallRng,
+    dither: &Dither,
     sector_num: usize,
 ) -> [u8; MODE1_2048_CHUNK_SIZE] {
     let mut chunk = [0; MODE1_2048_CHUNK_SIZE];
@@ -287,11 +286,11 @@ pub fn generate_mode1_2048_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE1_2048_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
-        if rng.random_ratio(luma as u32, 255) {
+        if dither.dither(luma, sector_num as u64 * MODE1_2048_CHUNK_SIZE as u64 + i as u64) {
             chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {
             chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
-        }
+        };
     }
 
     chunk
@@ -301,7 +300,7 @@ pub fn generate_mode1_2048_chunk(
 pub fn generate_mode2_2336_chunk(
     disc: &CdDisc,
     image: &DiscPicture,
-    rng: &mut SmallRng,
+    dither: &Dither,
     sector_num: usize,
 ) -> [u8; MODE2_2336_CHUNK_SIZE] {
     let mut chunk = [0; MODE2_2336_CHUNK_SIZE];
@@ -309,11 +308,11 @@ pub fn generate_mode2_2336_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE2_2336_CHUNK_SIZE {
         let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
-        if rng.random_ratio(luma as u32, 255) {
+        if dither.dither(luma, sector_num as u64 * MODE2_2336_CHUNK_SIZE as u64 + i as u64) {
             chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {
             chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
-        }
+        };
     }
     chunk
 }

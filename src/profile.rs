@@ -1,8 +1,8 @@
-use std::fmt::{self, write};
+use std::fmt;
 
-use crate::profile::ExtrapolationType::Clamp;
+use crate::geometry::{ExtrapolationMethod, InterpolationMethod};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiscFamily {
     #[serde(rename = "CD")]
     Cd,
@@ -19,10 +19,10 @@ impl fmt::Display for DiscFamily {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiscType {
     #[serde(rename = "CD-R")]
-    CdRr,
+    CdR,
     #[serde(rename = "CD-RW")]
     CdRw,
     #[serde(rename = "DVD-R")]
@@ -38,7 +38,7 @@ pub enum DiscType {
 impl fmt::Display for DiscType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DiscType::CdRr => write!(f, "CD-R"),
+            DiscType::CdR => write!(f, "CD-R"),
             DiscType::CdRw => write!(f, "CD-RW"),
             DiscType::DvdMinusR => write!(f, "DVD-R"),
             DiscType::DvdPlusR => write!(f, "DVD+R"),
@@ -72,34 +72,14 @@ pub enum CorrectionProfile {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct InterpolationCorrection {
     pub method: InterpolationMethod,
-    pub extrapolation: ExtrapolationType,
+    pub extrapolation: ExtrapolationMethod,
     pub samples: Vec<[f64; 2]>
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum InterpolationMethod {
-    Linear
-}
-
-impl fmt::Display for InterpolationMethod {
+impl fmt::Display for ExtrapolationMethod {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            InterpolationMethod::Linear => write!(f, "Linear"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ExtrapolationType {
-    Clamp
-}
-
-impl fmt::Display for ExtrapolationType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ExtrapolationType::Clamp => write!(f, "Clamp"),
+            ExtrapolationMethod::Clamp => write!(f, "Clamp"),
         }
     }
 }
@@ -115,4 +95,40 @@ pub struct DiscProfile {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ProfileMetadata {
     // TODO: Fill profile metadata
+    pub media: Option<MediaMetadata>,
+    pub recording: Option<RecordingMetadata>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MediaMetadata {
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub brand: Option<String>,
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub description: Option<String>,
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub rated_speed: Option<String>,
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub mid: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RecordingMetadata {
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub drive: Option<String>,
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub firmware: Option<String>,
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub speed_x: Option<f64>,
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub software: Option<String>,
+    #[serde(deserialize_with = "deserialize_option_or_none", default)]
+    pub date: Option<String>,
+}
+
+fn deserialize_option_or_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Ok(T::deserialize(deserializer).ok())
 }

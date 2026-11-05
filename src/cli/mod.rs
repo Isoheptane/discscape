@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 
 use profile::ProfileCommands;
 
-use crate::cli::profile::profile_command;
+use crate::cli::{profile::profile_command, render::{RenderArgs, render_command}};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -16,15 +16,14 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    #[command(subcommand)]    
-    Render,
+    Render(RenderArgs),
     #[command(subcommand)]    
     Profile(ProfileCommands),
 }
 
 pub fn run(cli: Cli) {
     match cli.command {
-        Command::Render => todo!(),
+        Command::Render(args) => render_command(args),
         Command::Profile(profile_commands) => profile_command(profile_commands),
     }
 }

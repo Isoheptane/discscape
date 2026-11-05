@@ -12,7 +12,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use discscape::dither::Dither;
 use discscape::dvd::{self, DvdDisc, DvdDiscType};
-use discscape::geometry::{PhaseCorrectionInterpolation, PhaseSample, SampleInterpolation};
+use discscape::geometry::{PhaseCorrectionInterpolation, PhaseSample, InterpolationMethod};
 use discscape::geometry::{CalibratedSpiralGeometry, PhaseCorrection, SpiralGeometry};
 use discscape::cd::CdDisc;
 use discscape::picture::{DiscPicture};
@@ -83,7 +83,7 @@ fn main() {
 
     let correction = PhaseCorrectionInterpolation {
         samples,
-        interpolation: SampleInterpolation::Linear
+        interpolation: InterpolationMethod::Linear
     };
     
     let correction = PhaseCorrection::Samples(correction).to_lut(25.0, 58.0, 0.1);

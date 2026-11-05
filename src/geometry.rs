@@ -1,4 +1,4 @@
-use std::f64::consts::{PI, TAU};
+use std::{f64::consts::{PI, TAU}, fmt};
 
 /// Polar coordination of (r, rev)
 pub type PolarCoord = (f64, f64);
@@ -73,17 +73,31 @@ pub struct PhaseSample {
     pub correction_rev: f64
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SampleInterpolation {
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InterpolationMethod {
     Linear,
-    Pchip,
+}
+
+impl fmt::Display for InterpolationMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InterpolationMethod::Linear => write!(f, "Linear"),
+        }
+    }
 }
 
 /// Use phase samples with interpolation for correction
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhaseCorrectionInterpolation {
     pub samples: Vec<PhaseSample>,
-    pub interpolation: SampleInterpolation
+    pub interpolation: InterpolationMethod
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExtrapolationMethod {
+    Clamp
 }
 
 impl PhaseCorrectionInterpolation {
@@ -105,6 +119,7 @@ impl PhaseCorrectionInterpolation {
         a.correction_rev + t * (b.correction_rev - a.correction_rev)
     }
 
+    #[allow(dead_code)]
     #[inline]
     fn pchip(&self, radius_mm: f64) -> f64 {
         let samples = &self.samples;
@@ -163,12 +178,12 @@ impl PhaseCorrectionInterpolation {
     #[inline]
     pub fn correction_rev(&self, radius_mm: f64) -> f64 {
         match self.interpolation {
-            SampleInterpolation::Linear => self.linear(radius_mm),
-            SampleInterpolation::Pchip => self.pchip(radius_mm),
+            InterpolationMethod::Linear => self.linear(radius_mm),
+            // InterpolationMethod::Pchip => self.pchip(radius_mm),
         }
     }
 
-    pub fn new(samples: Vec<PhaseSample>, interpolation: SampleInterpolation) -> Self {
+    pub fn new(samples: Vec<PhaseSample>, interpolation: InterpolationMethod) -> Self {
         let mut samples = samples;
         samples.sort_by(|a, b| a.radius_mm.total_cmp(&b.radius_mm));
         Self { samples, interpolation }
