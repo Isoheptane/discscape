@@ -219,11 +219,16 @@ pub fn generate_sector(
     for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
 
     // Initialize image luma sampling first
-    const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
-    const IMAGE_SAMPLES_LEN: usize = PHYSICAL_SECTOR_CHANNEL_WORDS as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
-    assert_eq!(PHYSICAL_SECTOR_CHANNEL_WORDS as usize % CHANNEL_WORDS_PER_IMAGE_SAMPLE, 0);
-
+    // const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
+    // const IMAGE_SAMPLES_LEN: usize = PHYSICAL_SECTOR_CHANNEL_WORDS as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
+    // assert_eq!(PHYSICAL_SECTOR_CHANNEL_WORDS as usize % CHANNEL_WORDS_PER_IMAGE_SAMPLE, 0);
     // 2418 = 2 x 3 x 13 x 31, take one sample per 6 channel words
+
+    // Maximum channel_word for controllable region is on Row 12 end, which also contains EDC and PI/PO...
+    // | SYNC 2 | DATA 91 | SYNC 2 | DATA 77 | EDC 4 | PI/PO 10 |
+    // Here we only omit end 12 words to make it divisible to 6;
+    const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
+    const IMAGE_SAMPLES_LEN: usize = (SYNC_FRAME_CHANNEL_WORDS as usize * 24 - 12) / 6;
 
     let mut image_samples = [0u8; IMAGE_SAMPLES_LEN];
 
