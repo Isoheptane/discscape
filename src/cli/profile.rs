@@ -8,10 +8,10 @@ pub enum ProfileCommands {
     Validate
 }
 
-pub fn profile_command(cmd: ProfileCommands) {
+pub fn profile_command(cmd: ProfileCommands) -> anyhow::Result<()> {
     match cmd {
         ProfileCommands::Show(profile_show_args) => {
-            profile_show_command(profile_show_args);
+            profile_show_command(profile_show_args)
         }
         ProfileCommands::Validate => todo!(),
     }
@@ -22,7 +22,7 @@ pub struct ProfileShowArgs {
     file: String
 }
 
-pub fn profile_show_command(cmd: ProfileShowArgs) {
+pub fn profile_show_command(cmd: ProfileShowArgs) -> anyhow::Result<()> {
     let content = std::fs::read_to_string(&cmd.file).expect("Can not read file");
     let profile: DiscProfile = serde_json::from_str(&content).expect("Can not parse string");
 
@@ -113,4 +113,5 @@ pub fn profile_show_command(cmd: ProfileShowArgs) {
         }
     }
 
+    Ok(())
 }

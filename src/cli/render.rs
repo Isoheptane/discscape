@@ -1,11 +1,12 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 
+use anyhow::Context;
 use clap::Args;
 use discscape::cd::{self, CdDisc};
 use discscape::dither::Dither;
 use discscape::dvd::{self, DvdDisc};
-use discscape::profile::{CorrectionProfile, DiscFamily, DiscProfile};
+use discscape::profile::{CorrectionProfile, DiscFamily, DiscProfile, DiscType};
 use discscape::picture::DiscPicture;
 use discscape::geometry::{CalibratedSpiralGeometry, PhaseCorrection, PhaseCorrectionInterpolation, PhaseSample, SpiralGeometry};
 use image::ImageReader;
@@ -53,20 +54,33 @@ pub struct RenderArgs {
     pub invert: bool,
 }
 
-pub fn render_command(args: RenderArgs) {
-    let profile_content = std::fs::read_to_string(&args.profile).expect("Can not read file");
-    let profile: DiscProfile = serde_json::from_str(&profile_content).expect("Can not parse string");
+#[derive(Debug, thiserror::Error)]
+pub enum RenderError {
+    #[error("Invalid sector range: start_sector ({start}) must be strictly less than end_sector ({end})")]
+    InvalidSectorRange { start: u64, end: u64 },
+    #[error("Sector range out of bounds: end_sector ({end}) exceeds disc capacity ({capacity})")]
+    SectorOutOfBounds { end: u64, capacity: u64 },
+    #[error("CD disc profile requires an output format. Please specify one using '--format <audio|mode1-2352|mode1-2048|mode2-2336>'")]
+    MissingCdFormat,
+    #[error("Incompatible profile: DVD cannot have disc type {0:?}")]
+    InvalidDvdDiscType(DiscType),
+}
+
+pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
+    let profile_content = std::fs::read_to_string(&args.profile)
+        .with_context(|| format!("Failed to read profile file at '{}'", args.profile.display()))?;
+    let profile: DiscProfile = serde_json::from_str(&profile_content)
+        .with_context(|| format!("Failed to parse JSON in profile '{}'", args.profile.display()))?;
+
+    let disc = profile.disc;
 
     let start_sector = args.start_sector.unwrap_or(0);
-    let end_sector = args.end_sector.unwrap_or(profile.disc.capacity_sectors);
-
-    // Replace this to more friendly error later
-    assert!(start_sector < end_sector);
-    assert!(end_sector <= profile.disc.capacity_sectors);
-
-    if profile.disc.family == DiscFamily::Cd && args.format.is_none() {
-        // Replace this to more friendly error later
-        panic!("Please specify output format for CD")
+    let end_sector = args.end_sector.unwrap_or(disc.capacity_sectors);
+    if start_sector >= end_sector {
+        return Err(RenderError::InvalidSectorRange { start: start_sector, end: end_sector }.into())
+    }
+    if end_sector > disc.capacity_sectors {
+        return Err(RenderError::SectorOutOfBounds { end: end_sector, capacity: disc.capacity_sectors }.into())
     }
 
     let geometry = SpiralGeometry::new(
@@ -106,15 +120,16 @@ pub fn render_command(args: RenderArgs) {
     let inner: Box<dyn Write> = if &args.output == "-" {
         Box::new(std::io::stdout().lock())
     } else {
-        let file = File::create(args.output).expect("Can't open file or output");
-
+        let file = File::create(&args.output)
+            .with_context(|| format!("Failed to create or open output file '{}'", args.output))?;
         Box::new(file)
     };
     let mut writer = BufWriter::with_capacity(1024 * 1024, inner);
 
     let image = ImageReader::open(args.image)
-        .expect("Failed to open")
-        .decode().expect("Failed to decode");
+        .with_context(|| format!("Failed to open image file '{}'", args.output))?
+        .decode()
+        .with_context(|| format!("Failed to decode image file'{}'", args.output))?;
     let mut grayscale = image.grayscale();
     if args.invert {
         grayscale.invert();
@@ -123,49 +138,55 @@ pub fn render_command(args: RenderArgs) {
 
     let dither = Dither::splitmix64(args.seed.unwrap_or(0x114514));
 
-    match profile.disc.family {
+    match disc.family {
         DiscFamily::Cd => {
-            let disc = CdDisc::new(geometry, profile.disc.capacity_sectors);
-            match args.format.unwrap() {
+            let format = args.format.ok_or(RenderError::MissingCdFormat)?;
+            let disc = CdDisc::new(geometry, disc.capacity_sectors);
+            match format {
                 CdFormat::Audio => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
                         cd::generate_audio_chunk(&disc, &picture, &dither, i)
-                    );
+                    )?;
                 }
                 CdFormat::Mode1_2352 => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
                         cd::generate_mode1_2352_chunk(&disc, &picture, &dither, i)
-                    );
+                    )?;
                 }
                 CdFormat::Mode1_2048 => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
                         cd::generate_mode1_2048_chunk(&disc, &picture, &dither, i)
-                    );
+                    )?;
                 }
                 CdFormat::Mode2_2336 => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
                         cd::generate_mode2_2336_chunk(&disc, &picture, &dither, i)
-                    );
+                    )?;
                 }
             }
         },
         DiscFamily::Dvd => {
-            let disc_type = match profile.disc.disc_type {
-                discscape::profile::DiscType::CdR => panic!("DVD should not have disc type CD-R"),
-                discscape::profile::DiscType::CdRw => panic!("DVD should not have disc type CD-RW"),
+            if let Some(fmt) = args.format {
+                eprintln!("[WARN] '--format {fmt:?}' is ignored because the loaded profile is for a DVD.");
+            }
+
+            let disc_type = match disc.disc_type {
                 discscape::profile::DiscType::DvdMinusR => discscape::dvd::DvdDiscType::MinusR,
                 discscape::profile::DiscType::DvdPlusR => discscape::dvd::DvdDiscType::PlusR,
                 discscape::profile::DiscType::DvdMinusRw => discscape::dvd::DvdDiscType::MinusRw,
                 discscape::profile::DiscType::DvdPlusRw => discscape::dvd::DvdDiscType::PlusRw,
+                discscape::profile::DiscType::CdR |
+                discscape::profile::DiscType::CdRw => return Err(RenderError::InvalidDvdDiscType(disc.disc_type).into())
             };
-            let disc = DvdDisc::new(geometry, disc_type, profile.disc.capacity_sectors);
+            let disc = DvdDisc::new(geometry, disc_type, disc.capacity_sectors);
 
             render_sectors(&mut writer, start_sector, end_sector, |i|
                 dvd::generate_sector(&disc, &picture, &dither, i)
-            );
+            )?;
         },
     }
 
+    Ok(())
 }
 
 fn render_sectors<W, F, const N: usize>(
@@ -173,24 +194,29 @@ fn render_sectors<W, F, const N: usize>(
     start_sector: u64,
     end_sector: u64,
     mut generate: F,
-) where
+) -> anyhow::Result<()>
+where
     W: Write,
     F: FnMut(usize) -> [u8; N],
 {
     let bar = ProgressBar::new((end_sector - start_sector) * N as u64);
 
     bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}, ETA: {eta:>3}")
-        .unwrap()
+        .expect("Invalid progress bar template")
         .progress_chars("#>.")
     );
 
     for sector in start_sector..end_sector {
         let chunk = generate(sector as usize);
         // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-        writer.write_all(&chunk).expect("Failed to write to writer");
+        writer.write_all(&chunk)
+            .context("Failed to write sector data to output stream")?;
         bar.inc(N as u64);
     }
     
-    writer.flush().expect("Failed to flush buffer");
+    writer.flush()
+        .context("Failed to flush buffer to output data")?;
     bar.finish();
+
+    Ok(())
 }

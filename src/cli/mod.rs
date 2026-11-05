@@ -21,7 +21,7 @@ pub enum Command {
     Profile(ProfileCommands),
 }
 
-pub fn run(cli: Cli) {
+pub fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Render(args) => render_command(args),
         Command::Profile(profile_commands) => profile_command(profile_commands),
