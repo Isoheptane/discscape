@@ -5,19 +5,16 @@
         "capacity_sectors": 2295104
     },
     "geometry": {
-        "r": 24.0,
+        "r0": 24.0,
         "pitch": 0.7414367253530723,
         "n": 45981.86501395135
-    },
-    "correction_samples": {
-        "radius_mm": [],
-        "correction_deg": []
     },
     "metadata": {
         "media": {
             "brand": "Verbatim",
-            "description": "Verbatim DVD+R AZO Verbatim#43498",
-            "rated_speed": "16x"
+            "description": "Verbatim DVD+R AZO 16x Verbatim#43498",
+            "rated_speed": "16x",
+            "mid": "MCC/004"
         },
         "recording": {
             "drive": "HP DVD A DS8ACSH",

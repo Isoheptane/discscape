@@ -5,13 +5,9 @@
         "capacity_sectors": 359848
     },
     "geometry": {
-        "r": 25.0,
+        "r0": 25.0,
         "pitch": 1.509401579,
         "n": 22119.863037380
-    },
-    "correction_samples": {
-        "radius_mm": [],
-        "correction_deg": []
     },
     "metadata": {
         "media": {
