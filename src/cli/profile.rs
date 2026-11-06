@@ -4,6 +4,7 @@ use clap::{Subcommand, Args};
 use discscape::geometry::correction::PhaseCorrection;
 use discscape::profile::DiscProfile;
 use discscape::disc::Disc;
+use serde_json::Value;
 
 #[derive(Subcommand)]
 pub enum ProfileCommands {
@@ -100,37 +101,56 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
     println!();
 
     if let Some(metadata) = profile.metadata {
-        if let Some(media) = metadata.media {
+        if let Some(media) = metadata.get("media") {
             println!("Media Metadata");
-            if let Some(v) = media.brand {
+            if let Some(Value::String(v)) = media.get("brand") {
                 println!("  Brand:              {v}")
             }
-            if let Some(v) = media.description {
+            if let Some(Value::String(v)) = media.get("description") {
                 println!("  Description:        {v}")
             }
-            if let Some(v) = media.mid {
+            if let Some(Value::String(v)) = media.get("mid") {
                 println!("  Media ID:           {v}")
             }
-            if let Some(v) = media.rated_speed {
+            if let Some(Value::String(v)) = media.get("rated_speed") {
                 println!("  Rated Speed:        {v}")
             }
             println!();
         }
-        if let Some(recording) = metadata.recording{
+
+        if let Some(recording) = metadata.get("recording") {
             println!("Recording Metadata");
-            if let Some(v) = recording.drive {
+            if let Some(Value::String(v)) = recording.get("drive") {
                 println!("  Drive:              {v}")
             }
-            if let Some(v) = recording.firmware {
+            if let Some(Value::String(v)) = recording.get("firmware") {
                 println!("  Recorder Firmware:  {v}")
             }
-            if let Some(v) = recording.speed_x {
-                println!("  Recording Speed:    {v:.1}x")
+            if let Some(Value::Number(v)) = recording.get("speed_x") {
+                println!("  Recording Speed:    {v}x",)
             }
-            if let Some(v) = recording.software {
+            if let Some(Value::String(v)) = recording.get("software") {
                 println!("  Recording Software: {v}")
             }
             println!();
+        }
+
+        if let Some(notes) = metadata.get("notes") {
+            match notes {
+                Value::Array(array) => {
+                    println!("Notes");
+                    for line in array.iter().filter_map(|v| v.as_str()) {
+                        println!("  - {line}");
+                    }
+                    println!();
+                }
+                Value::String(s) => {
+                    println!("Notes");
+                    println!("  {s}");
+                    println!();
+                }
+                _ => {}
+            };
         }
     }
 

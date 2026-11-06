@@ -92,48 +92,7 @@ pub struct DiscProfile {
     pub disc: DiscInfo,
     pub geometry: GeometryProfile,
     pub correction: Option<CorrectionProfile>,
-    pub metadata: Option<ProfileMetadata>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ProfileMetadata {
-    // TODO: Fill profile metadata
-    pub media: Option<MediaMetadata>,
-    pub recording: Option<RecordingMetadata>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct MediaMetadata {
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub brand: Option<String>,
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub description: Option<String>,
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub rated_speed: Option<String>,
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub mid: Option<String>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RecordingMetadata {
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub drive: Option<String>,
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub firmware: Option<String>,
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub speed_x: Option<f64>,
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub software: Option<String>,
-    #[serde(deserialize_with = "deserialize_option_or_none", default)]
-    pub date: Option<String>,
-}
-
-fn deserialize_option_or_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Ok(T::deserialize(deserializer).ok())
+    pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 #[derive(Debug, thiserror::Error)]
