@@ -223,7 +223,7 @@ fn sample_image_luma(
 /// Generates a full audio sector
 pub fn generate_audio_chunk(
     disc: &CdDisc,
-    image: &DiscPicture,
+    picture: &DiscPicture,
     dither: &Dither,
     sector_num: usize,
 ) -> [u8; AUDIO_CHUNK_SIZE] {
@@ -231,7 +231,7 @@ pub fn generate_audio_chunk(
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..AUDIO_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, (sector_base + i) as u64, false);
+        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64, false);
         if dither.dither(luma, sector_num as u64 * AUDIO_CHUNK_SIZE as u64 + i as u64) {
             chunk[i] = EFM_BYTE_DENSITY_HIGH;
         } else {
@@ -245,7 +245,7 @@ pub fn generate_audio_chunk(
 /// Generates a RAW MODE1/2352 chunk, but L-EC information is filled with image data
 pub fn generate_mode1_2352_chunk(
     disc: &CdDisc,
-    image: &DiscPicture,
+    picture: &DiscPicture,
     dither: &Dither,
     sector_num: usize,
 ) -> [u8; MODE1_2352_CHUNK_SIZE] {
@@ -263,7 +263,7 @@ pub fn generate_mode1_2352_chunk(
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 16..MODE1_2352_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, (sector_base + i) as u64, true);
+        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64, true);
         if dither.dither(luma, sector_num as u64 * MODE1_2352_CHUNK_SIZE as u64 + i as u64) {
             chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i - 12];
         } else {
@@ -277,7 +277,7 @@ pub fn generate_mode1_2352_chunk(
 /// Generates a RAW MODE1/2048 chunk
 pub fn generate_mode1_2048_chunk(
     disc: &CdDisc,
-    image: &DiscPicture,
+    picture: &DiscPicture,
     dither: &Dither,
     sector_num: usize,
 ) -> [u8; MODE1_2048_CHUNK_SIZE] {
@@ -285,7 +285,7 @@ pub fn generate_mode1_2048_chunk(
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE1_2048_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
+        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64 + 16, true);
         if dither.dither(luma, sector_num as u64 * MODE1_2048_CHUNK_SIZE as u64 + i as u64) {
             chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {
@@ -299,7 +299,7 @@ pub fn generate_mode1_2048_chunk(
 /// Generates a RAW MODE2/2336 chunk
 pub fn generate_mode2_2336_chunk(
     disc: &CdDisc,
-    image: &DiscPicture,
+    picture: &DiscPicture,
     dither: &Dither,
     sector_num: usize,
 ) -> [u8; MODE2_2336_CHUNK_SIZE] {
@@ -307,7 +307,7 @@ pub fn generate_mode2_2336_chunk(
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE2_2336_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, image, (sector_base + i) as u64 + 16, true);
+        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64 + 16, true);
         if dither.dither(luma, sector_num as u64 * MODE2_2336_CHUNK_SIZE as u64 + i as u64) {
             chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
         } else {

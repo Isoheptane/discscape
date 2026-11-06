@@ -163,7 +163,7 @@ impl DvdDisc {
 
 pub fn generate_sector(
     disc: &DvdDisc,
-    image: &DiscPicture,
+    picture: &DiscPicture,
     dither: &Dither,
     sector_num: usize,
 ) -> [u8; MAIN_DATA_SIZE] {
@@ -220,7 +220,7 @@ pub fn generate_sector(
             + mid_word as u64;
         
         let coord = disc.channel_word_to_polar_coord(abs_pos);
-        let luma = image.sample_polar(coord);
+        let luma = picture.sample_polar(coord);
         image_samples[i] = luma;
     }
     let image_samples = image_samples;
