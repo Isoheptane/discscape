@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::geometry::{ExtrapolationMethod, InterpolationMethod};
+use crate::geometry::{CorrectedSpiralGeometry, ExtrapolationMethod, InterpolationMethod, PhaseCorrection, SpiralGeometry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiscFamily {
@@ -148,4 +148,25 @@ pub enum ProfileError {
     InsufficientCorrectionSamples { count: usize, required: usize },
     #[error("Invalid disc type {disc_type} for DVD")]
     InvalidDvdDiscType { disc_type: DiscType },
+}
+
+impl DiscProfile {
+    pub fn build_geometry(&self) -> Result<CorrectedSpiralGeometry, ProfileError> {
+        let base_geometry = SpiralGeometry::try_from(self.geometry.clone())?;
+        let correction = match self.correction.clone() {
+            Some(correction) => Some(PhaseCorrection::try_from(correction)?),
+            None => None,
+        };
+        let lut_correction = correction.map(|correction| {
+            let r0 = base_geometry.r0_mm();
+            let rend = base_geometry.outer_radius_mm();
+            // TODO: Maybe require user input step later
+            let lut = correction.to_lut(r0, rend, 0.1);
+            PhaseCorrection::Lut(lut)
+        });
+        Ok(CorrectedSpiralGeometry {
+            geometry: base_geometry,
+            phase_correction: lut_correction,
+        })
+    }
 }
