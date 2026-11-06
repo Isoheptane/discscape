@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::geometry::{CorrectedSpiralGeometry, ExtrapolationMethod, InterpolationMethod, PhaseCorrection, SpiralGeometry};
+use crate::geometry::{CorrectedSpiralGeometry, SpiralGeometry, correction::{ExtrapolationMethod, InterpolationMethod, PhaseCorrection}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiscFamily {

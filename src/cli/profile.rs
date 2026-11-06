@@ -1,8 +1,8 @@
 
 use anyhow::Context;
 use clap::{Subcommand, Args};
+use discscape::geometry::correction::PhaseCorrection;
 use discscape::profile::DiscProfile;
-use discscape::geometry::PhaseCorrection;
 use discscape::disc::Disc;
 
 #[derive(Subcommand)]
