@@ -8,7 +8,9 @@ use crate::cli::profile::scale::{ProfileScaleArgs, profile_scale_command};
 
 #[derive(Subcommand)]
 pub enum ProfileCommands {
+    /// Inspect profile content
     Show(ProfileShowArgs),
+    /// Scale profile geometry size
     Scale(ProfileScaleArgs),
 }
 

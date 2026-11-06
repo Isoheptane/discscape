@@ -16,7 +16,10 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Render image file into disc data
     Render(RenderArgs),
+
+    /// Profile operations
     #[command(subcommand)]    
     Profile(ProfileCommands),
 }
