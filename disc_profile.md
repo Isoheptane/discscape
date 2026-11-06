@@ -11,7 +11,6 @@ The following example is a template based on one CD-RW configuration. **Do not a
 ```json
 {
     "disc": {
-        "family": "CD",
         "type": "CD-RW",
         "capacity_sectors": 359849
     },
@@ -55,8 +54,7 @@ The following example is a template based on one CD-RW configuration. **Do not a
 ### `disc`: Recording Medium
 | Field | Type | Description |
 | --- | --- | --- |
-| `family` | string | Optical disc family, currently `CD` or `DVD`. |
-| `type` | string | Specific medium type, such as `CD-R`, `CD-RW`, `DVD-R`, `DVD+R`, `DVD-RW`, or `DVD+RW`. It must agree with `family`. |
+| `type` | string | Specific medium type, such as `CD-R`, `CD-RW`, `DVD-R`, `DVD+R`, `DVD-RW`, or `DVD+RW`. |
 | `capacity_sectors` | integer | Number of addressable logical sectors in the target disc model. |
 
 `capacity_sectors`is a count of sectors, not a size in bytes.
