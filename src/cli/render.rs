@@ -22,14 +22,13 @@ pub enum CdFormat {
 pub struct RenderArgs {
     /// Path to the input image to be rendered onto the disc
     pub image: std::path::PathBuf,
-    #[arg(long, short = 'p', value_name = "FILE")]
-
-    /// Path to the disc profile document
-    pub profile: std::path::PathBuf,
-    #[arg(long, short = 'o', value_name = "FILE")]
 
     /// Path to the output disc image file. Use '-' for output to stdout
     pub output: String,
+
+    /// Path to the disc profile document
+    #[arg(long, short = 'p', value_name = "FILE")]
+    pub profile: std::path::PathBuf,
 
     /// Output sector data format
     #[arg(long)]

@@ -14,24 +14,17 @@ cargo run --release -- --help
 ### Render
 Render an image using JSON disc profile
 ```bash
-discscape render picture.png \
-    --profile disc.json \
-    --output picture.iso 
+discscape render picture.png data.iso --profile disc.json
 ```
 
 For CD, specify the output sector format
 ```bash
-discscape render picture.png \
-    --profile disc.json \
-    --output picture.iso \
-    --format audio
+discscape render picture.png data.bin --profile disc.json --format audio
 ```
 
 To write the generated data to standard output, use `-` for output filename:
 ```bash
-discscape render picture.png \
-    --profile disc.json \
-    -o -
+discscape render picture.png - --profile disc.json
 ```
 
 ### Disc Profiles
