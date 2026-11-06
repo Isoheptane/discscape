@@ -138,15 +138,15 @@ where
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileError {
-    #[error("Invalid geometry parameter '{parameter}' ({value})")]
+    #[error("Profile have invalid geometry parameter '{parameter}' ({value})")]
     InvalidGeometry { parameter: &'static str, value: f64 },
-    #[error("Invalid correction sample '{parameter}' ({value}) at index {index}")]
+    #[error("Profile have invalid correction sample '{parameter}' ({value}) at index {index}")]
     InvalidCorrectionSample { parameter: &'static str, value: f64, index: usize },
-    #[error("Correction sample radii must be strictly increasing")]
+    #[error("Correction sample radii must be strictly increasing in profile")]
     InvalidCorrectionSamplesOrder,
-    #[error("Insufficient correction samples {count}, {required} required")]
+    #[error("Profile have insufficient correction samples {count}, {required} required")]
     InsufficientCorrectionSamples { count: usize, required: usize },
-    #[error("Invalid disc type {disc_type} for DVD")]
+    #[error("Profile have invalid disc type {disc_type} for DVD")]
     InvalidDvdDiscType { disc_type: DiscType },
 }
 

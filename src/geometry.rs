@@ -78,7 +78,7 @@ impl TryFrom<GeometryProfile> for SpiralGeometry {
             ("pitch_um", value.pitch_um),
             ("n", value.n),
         ] {
-            if !(value.is_finite() && value.is_sign_positive()) {
+            if !(value.is_finite() && value > 0.0) {
                 return Err(ProfileError::InvalidGeometry { parameter, value })
             }
         }
@@ -246,7 +246,7 @@ impl TryFrom<CorrectionInterpolationProfile> for PhaseCorrectionInterpolation {
         }).collect();
 
         for (idx, s) in samples.iter().enumerate() {
-            if !(s.radius_mm.is_finite() && s.radius_mm.is_sign_positive()) {
+            if !(s.radius_mm.is_finite() && s.radius_mm > 0.0) {
                 return Err(ProfileError::InvalidCorrectionSample {
                     parameter: "radius_mm",
                     value: s.radius_mm,
@@ -288,8 +288,6 @@ impl PhaseCorrectionLut {
         step_mm: f64,
         mut correction: impl FnMut(f64) -> f64,
     ) -> Self {
-        assert!(radius_max > radius_min);
-        assert!(step_mm > 0.0);
 
         let count = ((radius_max - radius_min) / step_mm).ceil() as usize;
 
