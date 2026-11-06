@@ -1,6 +1,11 @@
+mod efmplus;
+mod scramble;
+
+use efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity};
+use scramble::SCRAMBLE_LUT;
+
 use crate::picture::DiscPicture;
 use crate::geometry::{CorrectedSpiralGeometry, PolarCoord};
-use crate::efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity};
 use crate::dither::Dither;
 use crate::profile::{DiscType, ProfileError};
 
@@ -14,64 +19,17 @@ pub const DATA_FRAME_SIZE: usize        = DATA_FRAME_ROW_SIZE * DATA_FRAME_ROW_C
 pub const SECTOR_ID_SIZE: usize         = 4;
 pub const IED_SIZE: usize               = 2;
 pub const CPR_MAI_SIZE: usize           = 6;
-// pub const EDC_SIZE: usize            = 4;
+pub const EDC_SIZE: usize               = 4;
 
 pub const SECTOR_ID_OFFSET: usize       = 0;
 pub const IED_OFFSET: usize             = SECTOR_ID_OFFSET + SECTOR_ID_SIZE;
 pub const CPR_MAI_OFFSET: usize         = IED_OFFSET + IED_SIZE;
 pub const MAIN_DATA_OFFSET: usize       = CPR_MAI_OFFSET + CPR_MAI_SIZE;
-// pub const EDC_OFFSET: usize          = MAIN_DATA_OFFSET + MAIN_DATA_SIZE;
+pub const EDC_OFFSET: usize             = MAIN_DATA_OFFSET + MAIN_DATA_SIZE;
 
 // pub const SID_INFO_OFFSET: usize     = 0;
 // pub const SID_PSN_OFFSET: usize      = 1;
 // pub const SID_PSN_SIZE: usize        = 3;
-
-/* Scrambler */
-
-/*
-    The Scrambler uses 16 presets. Each 16 sector uses one preset and continue 
-
-*/
-
-pub const SCRAMBLE_LFSR_PRESET_SIZE: usize = 16;
-pub const SCRAMBLE_LFSR_INIT: [u16; SCRAMBLE_LFSR_PRESET_SIZE] = [
-    0x0001, 0x5500, 0x0002, 0x2A00,
-    0x0004, 0x5400, 0x0008, 0x2800,
-    0x0010, 0x5000, 0x0020, 0x2001,
-    0x0040, 0x4002, 0x0080, 0x0005,
-];
-
-pub const SCRAMBLE_LUT: [[u8; MAIN_DATA_SIZE]; SCRAMBLE_LFSR_PRESET_SIZE] = scramble_all_table();
-
-const fn scramble_sequence(init: u16) -> [u8; MAIN_DATA_SIZE] {
-    let mut lut = [0u8; MAIN_DATA_SIZE];
-
-    let mut lfsr: u32 = init as u32;
-    let mut i = 0;
-
-    while i < MAIN_DATA_SIZE {
-        lut[i] = (lfsr & 0xFF) as u8;
-        lfsr = (
-            (lfsr << 8 & 0x7F00) | 
-            ((lfsr >> 7) ^ (lfsr >> 3)) & 0xFF
-        ) as u32;
-
-        i += 1;
-    }
-    lut
-}
-
-const fn scramble_all_table() -> [[u8; MAIN_DATA_SIZE]; SCRAMBLE_LFSR_PRESET_SIZE] {
-    let mut lut = [[0u8; MAIN_DATA_SIZE]; SCRAMBLE_LFSR_PRESET_SIZE];
-    let mut i = 0;
-
-    while i < SCRAMBLE_LFSR_PRESET_SIZE {
-        lut[i] = scramble_sequence(SCRAMBLE_LFSR_INIT[i]);
-        i += 1;
-    }
-
-    lut
-}
 
 /* Record Frame sizes */
 pub const RECORD_FRAME_ROW_COUNT: u64   = 13;
@@ -231,6 +189,7 @@ pub fn generate_sector(
         So I just set IED to 0x00. That's fine, state machine will recover in
         2 bytes anyway.
     */
+
     state.next(0x00);
     state.next(0x00);
     // CPR_MAI
@@ -245,6 +204,7 @@ pub fn generate_sector(
     // Maximum channel_word for controllable region is on Row 12 end, which also contains EDC and PI/PO...
     // | SYNC 2 | DATA 91 | SYNC 2 | DATA 77 | EDC 4 | PI/PO 10 |
     // Here we only omit end 12 words to make it divisible to 6;
+    
     const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
     const IMAGE_SAMPLES_LEN: usize = (SYNC_FRAME_CHANNEL_WORDS as usize * 24 - 12) / 6;
 

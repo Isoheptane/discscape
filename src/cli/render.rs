@@ -3,9 +3,7 @@ use std::io::{BufWriter, Write};
 
 use anyhow::Context;
 use clap::Args;
-use discscape::cd::{self};
-use discscape::dvd::{self};
-use discscape::disc::Disc;
+use discscape::disc::{Disc, cd, dvd};
 use discscape::dither::Dither;
 use discscape::profile::DiscProfile;
 use discscape::picture::DiscPicture;

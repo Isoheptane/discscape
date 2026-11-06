@@ -1,5 +1,9 @@
-use crate::dvd::{DvdDisc, DvdDiscType};
-use crate::cd::CdDisc;
+pub mod cd;
+pub mod dvd;
+
+pub use cd::{*};
+pub use dvd::{*};
+
 use crate::geometry::CorrectedSpiralGeometry;
 use crate::profile::{DiscProfile, DiscType, ProfileError};
 
