@@ -67,7 +67,7 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
 
             if let (Some(first), Some(last))
             = (interp.samples.first(), interp.samples.last())  {
-                println!("    Radius Span:      {:.2} mm ~ {:.2} mm", first.radius_mm, last.radius_mm);
+                println!("    Radius Span:      {:.3} mm ~ {:.3} mm", first.radius_mm, last.radius_mm);
             }
 
             let min = interp.samples.iter()
@@ -78,7 +78,7 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
                 .map(|p| p.correction_rev)
                 .fold(f64::NEG_INFINITY, f64::max);
 
-            println!("    Value Range:      {:.6} rev ~ {:.6} rev", min, max);
+            println!("    Value Range:      {:+.6} rev ~ {:+.6} rev", min, max);
         },
         Some(PhaseCorrection::Lut(lut)) => {
             let r0_mm = lut.radius_min;
@@ -87,7 +87,7 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
             println!("Correction");
             println!("  Type:               LUT");
             println!("  LUT Size:           {}", lut.lut.len());
-            println!("  Radius Span:        {:.2} mm ~ {:.2} mm", r0_mm, rend_mm);
+            println!("  Radius Span:        {:.3} mm ~ {:.3} mm", r0_mm, rend_mm);
             println!("  Step:               {:.3} mm", lut.step);
 
             let min = lut.lut.iter()
@@ -98,7 +98,7 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
                 .map(|p| *p)
                 .fold(f64::NEG_INFINITY, f64::max);
 
-            println!("  Value Range:        {:.6} rev ~ {:.6} rev", min, max);
+            println!("  Value Range:        {:+.6} rev ~ {:+.6} rev", min, max);
         }
     }
     println!();
