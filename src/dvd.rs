@@ -133,7 +133,7 @@ pub const DVD_MINUS_RW_SID_INFO_DEFAULT: u8 = 0x20;
 pub const DVD_PLUS_R_SID_INFO_DEFAULT: u8   = 0x00;
 pub const DVD_PLUS_RW_SID_INFO_DEFAULT: u8  = 0x62;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DvdDiscType {
     PlusR,
     PlusRw,

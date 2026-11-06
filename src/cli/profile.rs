@@ -2,6 +2,8 @@
 use anyhow::Context;
 use clap::{Subcommand, Args};
 use discscape::profile::{CorrectionProfile, DiscProfile};
+use discscape::geometry::PhaseCorrection;
+use discscape::disc::Disc;
 
 #[derive(Subcommand)]
 pub enum ProfileCommands {
@@ -31,22 +33,20 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
     let profile: DiscProfile = serde_json::from_str(&profile_content)
         .with_context(|| format!("Failed to parse JSON in profile '{}'", args.file))?;
 
+    let disc = Disc::try_from(profile.clone())?;
+    let capacity_sectors = disc.sectors();
+    let geometry = disc.geometry();
+    let base_geometry = &geometry.geometry;
+    let r0_mm = base_geometry.r0_mm();
+    let rend_mm = base_geometry.outer_radius_mm();
+    let pitch_um = base_geometry.pitch_um();
+    let revolutions = base_geometry.revolutions();
+
     // println!("{:#?}", profile);
-
-    let disc = profile.disc;
-    let capacity_sectors = disc.capacity_sectors;
-
-    let geometry = profile.geometry;
-    let r0_mm = geometry.r0_mm;
-    let pitch_um = geometry.pitch_um;
-    let revolutions = geometry.n;
-    let rend_mm = r0_mm + (revolutions * pitch_um) / 1000.0;
-
-    let correction = profile.correction;
     
     println!("Disc Profile: {}\n", args.file);
     println!("Disc Information");
-    println!("  Type:               {}", disc.disc_type);
+    println!("  Type:               {}", profile.disc.disc_type);
     println!("  Capacity:           {capacity_sectors} sectors");
     println!();
     println!("Geometry");
@@ -56,29 +56,49 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
     println!("  Revolutions:        {revolutions:.6} rev");
     println!();
 
-    match correction {
+    match &geometry.phase_correction {
         None => { println!("Correction: None") },
-        Some(CorrectionProfile::Interpolation(interp)) => {
+        Some(PhaseCorrection::Interpolation(interp)) => {
             println!("Correction");
             println!("  Type:               Interpolation");
-            println!("  Method:             {}", interp.method);
+            println!("  Method:             {}", interp.interpolation);
             println!("  Extrapolation:      {}", interp.extrapolation);
             println!("  Sample Count:       {}", interp.samples.len());
 
             if let (Some(first), Some(last))
             = (interp.samples.first(), interp.samples.last())  {
-                println!("    Radius Span:      {:.2} mm ~ {:.2} mm", first[0], last[0]);
+                println!("    Radius Span:      {:.2} mm ~ {:.2} mm", first.radius_mm, last.radius_mm);
             }
 
             let min = interp.samples.iter()
-                .map(|p| p[1])
+                .map(|p| p.correction_rev)
                 .fold(f64::INFINITY, f64::min);
 
             let max = interp.samples.iter()
-                .map(|p| p[1])
+                .map(|p| p.correction_rev)
                 .fold(f64::NEG_INFINITY, f64::max);
 
             println!("    Value Range:      {:.6} rev ~ {:.6} rev", min, max);
+        },
+        Some(PhaseCorrection::Lut(lut)) => {
+            let r0_mm = lut.radius_min;
+            let rend_mm = lut.radius_min + lut.step * (lut.lut.len() - 1) as f64;
+
+            println!("Correction");
+            println!("  Type:               LUT");
+            println!("  LUT Size:           {}", lut.lut.len());
+            println!("  Radius Span:        {:.2} mm ~ {:.2} mm", r0_mm, rend_mm);
+            println!("  Step:               {:.3} mm", lut.step);
+
+            let min = lut.lut.iter()
+                .map(|p| *p)
+                .fold(f64::INFINITY, f64::min);
+
+            let max = lut.lut.iter()
+                .map(|p| *p)
+                .fold(f64::NEG_INFINITY, f64::max);
+
+            println!("  Value Range:        {:.6} rev ~ {:.6} rev", min, max);
         }
     }
     println!();

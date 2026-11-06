@@ -121,7 +121,7 @@ fn f3_to_le_bin(pos: FramePosition) -> Option<u64> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CdDisc {
-    geometry: CorrectedSpiralGeometry,
+    pub geometry: CorrectedSpiralGeometry,
     capacity_sectors: u64,
 
     total_frames: u64,

@@ -70,7 +70,7 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
     let profile: DiscProfile = serde_json::from_str(&profile_content)
         .with_context(|| format!("Failed to parse JSON in profile '{}'", args.profile.display()))?;
 
-    let disc = Disc::try_from(profile)?;
+    let disc = Disc::try_from(profile)?.with_lut_correction(0.1);
     let capacity = disc.sectors();
 
     let start_sector = args.start_sector.unwrap_or(0);
@@ -82,15 +82,6 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
         return Err(RenderError::SectorOutOfBounds { end: end_sector, capacity }.into())
     }
 
-    let inner: Box<dyn Write> = if &args.output == "-" {
-        Box::new(std::io::stdout().lock())
-    } else {
-        let file = File::create(&args.output)
-            .with_context(|| format!("Failed to create or open output file '{}'", args.output))?;
-        Box::new(file)
-    };
-    let mut writer = BufWriter::with_capacity(1024 * 1024, inner);
-
     let image = ImageReader::open(args.image)
         .with_context(|| format!("Failed to open image file '{}'", args.output))?
         .decode()
@@ -100,8 +91,16 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
         grayscale.invert();
     }
     let picture = DiscPicture::new(grayscale);
-
     let dither = Dither::splitmix64(args.seed.unwrap_or(0x114514));
+
+    let inner: Box<dyn Write> = if &args.output == "-" {
+        Box::new(std::io::stdout().lock())
+    } else {
+        let file = File::create(&args.output)
+            .with_context(|| format!("Failed to create or open output file '{}'", args.output))?;
+        Box::new(file)
+    };
+    let mut writer = BufWriter::with_capacity(1024 * 1024, inner);
 
     match disc {
         Disc::Cd(disc) => {

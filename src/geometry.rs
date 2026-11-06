@@ -376,4 +376,17 @@ impl CorrectedSpiralGeometry {
 
         (r, rev + rev_correction)
     }
+
+    pub fn with_lut_correction(self, lut_step_mm: f64) -> Self {
+        let phase_correction = self.phase_correction.map(|correction| {
+            let r0 = self.geometry.r0_mm();
+            let rend = self.geometry.outer_radius_mm();
+            PhaseCorrection::Lut(correction.to_lut(r0, rend, lut_step_mm))
+        });
+
+        Self {
+            geometry: self.geometry,
+            phase_correction,
+        }
+    }
 }
