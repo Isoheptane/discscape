@@ -35,6 +35,11 @@
             "speed_x": 10,
             "software": "cdrdao",
             "date": "2026-11-03"
-        }
+        },
+        "notes": [
+            "Geometry and phase correction: Calibrated",
+            "Radius scaling: Adjusted to 58 mm outer radius",
+            "Phase correction: Further refinement may be needed due to small bumps"
+        ]
     }
 }

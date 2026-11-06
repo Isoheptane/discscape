@@ -1,0 +1,32 @@
+{
+    "disc": {
+        "type": "CD-RW",
+        "capacity_sectors": 359849
+    },
+    "geometry": {
+        "r0_mm" : 0.0,
+        "pitch_um" : 0.0,
+        "n" : 0.0
+    },
+    "correction": {
+        "type": "interpolation",
+        "method": "linear",
+        "extrapolation": "clamp",
+        "samples": [
+        ]
+    },
+    "metadata": {
+        "media": {
+            "brand": "Mitsubishi",
+            "description": "Mitsubishi SERL CD-RW 4-12x",
+            "rated_speed": "4-12x"
+        },
+        "recording": {
+            "drive": "HP DVD A DS8ACSH",
+            "firmware": "LHS3",
+            "speed_x": 10,
+            "software": "cdrdao",
+            "date": "2026-11-03"
+        }
+    }
+}

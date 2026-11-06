@@ -47,7 +47,7 @@
             [55.0 , -0.000953],
             [56.0 , -0.000510],
             [57.0 ,  0.000045],
-            [58.0 , -0.000000]
+            [58.0 ,  0.000548]
         ]
     },
     "metadata": {
@@ -63,6 +63,11 @@
             "speed_x": 3,
             "software": "growisofs",
             "date": "2026-11-05"
-        }
+        },
+        "notes": [
+            "Geometry and phase correction: Calibrated",
+            "Verified on 2 discs of the same model (same drive)",
+            "Radius scaling: Not calibrated"
+        ]
     }
 }
