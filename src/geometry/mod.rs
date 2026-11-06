@@ -11,7 +11,7 @@ pub type PolarCoord = (f64, f64);
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PhaseSample {
     pub radius_mm: f64,
-    pub correction_rev: f64
+    pub rev: f64
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -51,19 +51,19 @@ impl PhaseCorrectionInterpolation {
 
         if i == 0 {
             match self.extrapolation {
-                ExtrapolationMethod::Clamp => return samples[0].correction_rev,
+                ExtrapolationMethod::Clamp => return samples[0].rev,
             }
         }
         if i == samples.len() {
             match self.extrapolation {
-                ExtrapolationMethod::Clamp => return samples[i - 1].correction_rev,
+                ExtrapolationMethod::Clamp => return samples[i - 1].rev,
             }
         }
 
         let a = samples[i - 1];
         let b = samples[i];
         let t = (radius_mm - a.radius_mm) / (b.radius_mm - a.radius_mm);
-        a.correction_rev + t * (b.correction_rev - a.correction_rev)
+        a.rev + t * (b.rev - a.rev)
     }
 
     #[allow(dead_code)]
@@ -77,19 +77,19 @@ impl PhaseCorrectionInterpolation {
 
         if i == 0 {
             match self.extrapolation {
-                ExtrapolationMethod::Clamp => return samples[0].correction_rev,
+                ExtrapolationMethod::Clamp => return samples[0].rev,
             }
         }
         if i == samples.len() {
             match self.extrapolation {
-                ExtrapolationMethod::Clamp => return samples[i - 1].correction_rev,
+                ExtrapolationMethod::Clamp => return samples[i - 1].rev,
             }
         }
 
         let x0 = samples[i - 1].radius_mm;
         let x1 = samples[i].radius_mm;
-        let y0 = samples[i - 1].correction_rev;
-        let y1 = samples[i].correction_rev;
+        let y0 = samples[i - 1].rev;
+        let y1 = samples[i].rev;
         let h = x1 - x0;
         let t = (radius_mm - x0) / h;
 
@@ -98,7 +98,7 @@ impl PhaseCorrectionInterpolation {
         }
 
         let secant = |j: usize| -> f64 {
-            (samples[j + 1].correction_rev - samples[j].correction_rev)
+            (samples[j + 1].rev - samples[j].rev)
                 / (samples[j + 1].radius_mm - samples[j].radius_mm)
         };
 
@@ -166,7 +166,7 @@ impl TryFrom<CorrectionInterpolationProfile> for PhaseCorrectionInterpolation {
             .into_iter()
             .map(|v| PhaseSample {
                 radius_mm: v[0],
-                correction_rev: v[1],
+                rev: v[1],
             })
             .collect();
 
@@ -178,10 +178,10 @@ impl TryFrom<CorrectionInterpolationProfile> for PhaseCorrectionInterpolation {
                     index: idx,
                 });
             }
-            if !(s.correction_rev.is_finite()) {
+            if !(s.rev.is_finite()) {
                 return Err(ProfileError::InvalidCorrectionSample {
                     parameter: "correction_rev",
-                    value: s.correction_rev,
+                    value: s.rev,
                     index: idx,
                 });
             }

@@ -67,11 +67,11 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
             }
 
             let min = interp.samples.iter()
-                .map(|p| p.correction_rev)
+                .map(|p| p.rev)
                 .fold(f64::INFINITY, f64::min);
 
             let max = interp.samples.iter()
-                .map(|p| p.correction_rev)
+                .map(|p| p.rev)
                 .fold(f64::NEG_INFINITY, f64::max);
 
             println!("    Value Range:      {:+.6} rev ~ {:+.6} rev", min, max);
