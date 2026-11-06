@@ -77,11 +77,11 @@ pub struct GeometryProfile {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum CorrectionProfile {
-    Interpolation(InterpolationCorrection)
+    Interpolation(CorrectionInterpolationProfile)
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct InterpolationCorrection {
+pub struct CorrectionInterpolationProfile {
     pub method: InterpolationMethod,
     pub extrapolation: ExtrapolationMethod,
     pub samples: Vec<[f64; 2]>
@@ -134,4 +134,16 @@ where
     D: serde::Deserializer<'de>,
 {
     Ok(T::deserialize(deserializer).ok())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProfileError {
+    #[error("Invalid geometry parameter '{parameter}' ({value})")]
+    InvalidGeometry { parameter: &'static str, value: f64 },
+    #[error("Invalid correction sample '{parameter}' ({value}) at index {index}")]
+    InvalidCorrectionSample { parameter: &'static str, value: f64, index: usize },
+    #[error("Invalid correction samples order")]
+    InvalidCorrectionSamplesOrder,
+    #[error("Insufficient correction samples {count}, {required} required")]
+    InsufficientCorrectionSamples { count: usize, required: usize },
 }

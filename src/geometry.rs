@@ -1,6 +1,7 @@
-use std::{f64::consts::{PI, TAU}, fmt};
+use std::fmt;
+use std::f64::consts::{PI, TAU};
 
-use crate::profile::GeometryProfile;
+use crate::profile::{CorrectionInterpolationProfile, GeometryProfile, ProfileError};
 
 /// Polar coordination of (r, rev)
 pub type PolarCoord = (f64, f64);
@@ -69,13 +70,29 @@ impl SpiralGeometry {
     }
 }
 
+impl TryFrom<GeometryProfile> for SpiralGeometry {
+    type Error = ProfileError;
+    fn try_from(value: GeometryProfile) -> Result<Self, Self::Error> {
+        for (parameter, value) in [
+            ("r0_mm", value.r0_mm),
+            ("pitch_um", value.pitch_um),
+            ("n", value.n),
+        ] {
+            if !(value.is_finite() && value.is_sign_positive()) {
+                return Err(ProfileError::InvalidGeometry { parameter, value })
+            }
+        }
+        Ok(Self::new(value.r0_mm, value.pitch_um, value.n))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PhaseSample {
     pub radius_mm: f64,
     pub correction_rev: f64
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum InterpolationMethod {
     Linear,
@@ -89,7 +106,7 @@ impl fmt::Display for InterpolationMethod {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ExtrapolationMethod {
     Clamp
@@ -107,22 +124,31 @@ impl fmt::Display for ExtrapolationMethod {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhaseCorrectionInterpolation {
     pub samples: Vec<PhaseSample>,
-    pub interpolation: InterpolationMethod
+    pub interpolation: InterpolationMethod,
+    pub extrapolation: ExtrapolationMethod,
 }
 
 impl PhaseCorrectionInterpolation {
 
     #[inline]
     fn linear(&self, radius_mm: f64) -> f64 {
+
         let samples = &self.samples;
         if samples.is_empty() { return 0.0; }
+
         let i = samples.partition_point(|v| v.radius_mm < radius_mm);
+
         if i == 0 {
-            return samples[0].correction_rev;
+            match self.extrapolation {
+                ExtrapolationMethod::Clamp => return samples[0].correction_rev
+            }
         }
         if i == samples.len() {
-            return samples[i - 1].correction_rev;
+            match self.extrapolation {
+                ExtrapolationMethod::Clamp => return samples[i - 1].correction_rev
+            }
         }
+
         let a = samples[i - 1];
         let b = samples[i];
         let t = (radius_mm - a.radius_mm) / (b.radius_mm - a.radius_mm);
@@ -137,11 +163,16 @@ impl PhaseCorrectionInterpolation {
             return 0.0;
         }
         let i = samples.partition_point(|v| v.radius_mm < radius_mm);
+
         if i == 0 {
-            return samples[0].correction_rev;
+            match self.extrapolation {
+                ExtrapolationMethod::Clamp => return samples[0].correction_rev
+            }
         }
         if i == samples.len() {
-            return samples[i - 1].correction_rev;
+            match self.extrapolation {
+                ExtrapolationMethod::Clamp => return samples[i - 1].correction_rev
+            }
         }
         
         let x0 = samples[i - 1].radius_mm;
@@ -193,10 +224,54 @@ impl PhaseCorrectionInterpolation {
         }
     }
 
-    pub fn new(samples: Vec<PhaseSample>, interpolation: InterpolationMethod) -> Self {
+    pub fn new(
+        samples: Vec<PhaseSample>, 
+        interpolation: InterpolationMethod,
+        extrapolation: ExtrapolationMethod
+    ) -> Self {
         let mut samples = samples;
         samples.sort_by(|a, b| a.radius_mm.total_cmp(&b.radius_mm));
-        Self { samples, interpolation }
+        Self { samples, interpolation, extrapolation }
+    }
+}
+
+impl TryFrom<CorrectionInterpolationProfile> for PhaseCorrectionInterpolation {
+    type Error = ProfileError;
+
+    fn try_from(value: CorrectionInterpolationProfile) -> Result<Self, Self::Error> {
+        // Check Samples
+        let samples: Vec<PhaseSample> = value.samples.into_iter().map(|v| PhaseSample {
+            radius_mm: v[0],
+            correction_rev: v[1],
+        }).collect();
+
+        if let Some((idx, s)) = samples.iter().enumerate().find(|(_, s)| {
+            !(s.radius_mm.is_finite() && s.radius_mm.is_sign_positive())
+        }) {
+            return Err(ProfileError::InvalidCorrectionSample {
+                parameter: "radius_mm",
+                value: s.radius_mm,
+                index: idx,
+            })
+        }
+
+        if let Some((idx, s)) = samples.iter().enumerate().find(|(_, s)| {
+            !s.correction_rev.is_finite()
+        }) {
+            return Err(ProfileError::InvalidCorrectionSample {
+                parameter: "correction_rev",
+                value: s.correction_rev,
+                index: idx,
+            })
+        }
+
+        if !samples.windows(2).all(|w| {
+            w[0].radius_mm < w[1].radius_mm
+        }) {
+            return Err(ProfileError::InvalidCorrectionSamplesOrder)
+        }
+    
+        Ok(Self::new(samples, value.method, value.extrapolation))
     }
 }
 

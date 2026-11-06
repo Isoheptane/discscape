@@ -8,7 +8,7 @@ use discscape::dither::Dither;
 use discscape::dvd::{self, DvdDisc};
 use discscape::profile::{CorrectionProfile, DiscFamily, DiscProfile, DiscType};
 use discscape::picture::DiscPicture;
-use discscape::geometry::{CorrectedSpiralGeometry, PhaseCorrection, PhaseCorrectionInterpolation, PhaseSample, SpiralGeometry};
+use discscape::geometry::{CorrectedSpiralGeometry, PhaseCorrection, PhaseCorrectionInterpolation, SpiralGeometry};
 use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -89,28 +89,23 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
         profile.geometry.n
     );
 
-    let correction = profile.correction.map(|correction| {
-        let correction = match correction {
+    let correction = match profile.correction {
+        Some(correction) => {
+            let correction = match correction {
             CorrectionProfile::Interpolation(interpo) => {
-                let samples: Vec<PhaseSample> = interpo.samples.into_iter().map(
-                    |[radius_mm, correction_rev]|
-                    PhaseSample { radius_mm, correction_rev }
-                ).collect();
-                let interpo = PhaseCorrectionInterpolation {
-                    samples,
-                    interpolation: interpo.method
-                };
-                PhaseCorrection::Samples(interpo)
-            }
-        };
-        // Might better let user control this
-        let lut = correction.to_lut(
-            geometry.r0_mm(), 
-            geometry.outer_radius_mm(), 
-            0.1
-        );
-        PhaseCorrection::Lut(lut)
-    });
+                    let interpo = PhaseCorrectionInterpolation::try_from(interpo)?;
+                    PhaseCorrection::Samples(interpo)
+                }
+            };
+            let lut = correction.to_lut(
+                geometry.r0_mm(), 
+                geometry.outer_radius_mm(), 
+                0.1
+            );
+            Some(PhaseCorrection::Lut(lut))
+        },
+        None => None,
+    };
 
     let geometry = CorrectedSpiralGeometry {
         geometry,
