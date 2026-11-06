@@ -79,10 +79,10 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
         return Err(RenderError::SectorOutOfBounds { end: end_sector, capacity }.into())
     }
 
-    let image = ImageReader::open(args.image)
-        .with_context(|| format!("Failed to open image file '{}'", args.output))?
+    let image = ImageReader::open(&args.image)
+        .with_context(|| format!("Failed to open image file '{}'", args.image.display()))?
         .decode()
-        .with_context(|| format!("Failed to decode image file'{}'", args.output))?;
+        .with_context(|| format!("Failed to decode image file'{}'", args.image.display()))?;
     let mut grayscale = image.grayscale();
     if args.invert {
         grayscale.invert();

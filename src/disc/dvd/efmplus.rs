@@ -103,7 +103,7 @@ impl EFMPlusStateMachine {
     pub fn next(&mut self, byte: u8) {
         let idx = EFM_TRANSITIONS[self.state as usize][byte as usize];
 
-        // SEFETY CONCERN:
+        // SAFETY CONCERN:
         // EFM_TRANSITIONS is guaranteed to be in 0..=3
         self.state = EFMPlusState::from_index(idx).expect("Invalid EFM+ transition state");
     }
