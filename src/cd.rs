@@ -1,6 +1,6 @@
 use crate::dither::Dither;
 use crate::picture::DiscPicture;
-use crate::geometry::{CalibratedSpiralGeometry, PolarCoord, SpiralGeometry};
+use crate::geometry::{CorrectedSpiralGeometry, PolarCoord, SpiralGeometry};
 
 pub const SECTOR_SIZE_BYTES:        usize = 2352;
 pub const SYNC_SIZE_BYTES:      usize = 12;
@@ -121,7 +121,7 @@ fn f3_to_le_bin(pos: FramePosition) -> Option<u64> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CdDisc {
-    geometry: CalibratedSpiralGeometry,
+    geometry: CorrectedSpiralGeometry,
     capacity_sectors: u64,
 
     total_frames: u64,
@@ -131,7 +131,7 @@ pub struct CdDisc {
 
 impl CdDisc {
 
-    pub fn new(geometry: CalibratedSpiralGeometry, sectors: u64) -> Self {
+    pub fn new(geometry: CorrectedSpiralGeometry, sectors: u64) -> Self {
         let total_frames = sectors * FRAMES_PER_SECTOR as u64;
         let total_bits = total_frames * CHANNEL_BITS_PER_FRAME;
 
@@ -144,7 +144,7 @@ impl CdDisc {
         }
     }
 
-    #[inline] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
+    #[inline] pub fn geometry(&self) -> &CorrectedSpiralGeometry { &self.geometry }
     #[inline] pub fn sectors(&self) -> u64 { self.capacity_sectors }
 
     pub fn from_cdpaint (
@@ -160,7 +160,7 @@ impl CdDisc {
         // Continuous equivalent revolution count
         let n = 2.0 * capacity / (eff_tr0 + (eff_tr0 * eff_tr0 + 2.0 * dtr * capacity).sqrt());
         let geometry = SpiralGeometry::new(r0, p, n);
-        let calib_geometry = CalibratedSpiralGeometry { 
+        let calib_geometry = CorrectedSpiralGeometry { 
             geometry, 
             phase_correction: None
         };

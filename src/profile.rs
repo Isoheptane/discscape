@@ -87,14 +87,6 @@ pub struct InterpolationCorrection {
     pub samples: Vec<[f64; 2]>
 }
 
-impl fmt::Display for ExtrapolationMethod {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ExtrapolationMethod::Clamp => write!(f, "Clamp"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DiscProfile {
     pub disc: DiscInfo,

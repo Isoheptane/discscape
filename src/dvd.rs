@@ -1,5 +1,5 @@
 use crate::picture::DiscPicture;
-use crate::geometry::{CalibratedSpiralGeometry, PolarCoord};
+use crate::geometry::{CorrectedSpiralGeometry, PolarCoord};
 use crate::efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity};
 use crate::dither::Dither;
 
@@ -153,7 +153,7 @@ impl DvdDiscType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DvdDisc {
-    geometry: CalibratedSpiralGeometry,
+    geometry: CorrectedSpiralGeometry,
     disc_type: DvdDiscType,
     capacity_sectors: u64,
 
@@ -163,7 +163,7 @@ pub struct DvdDisc {
 
 impl DvdDisc {
 
-    pub fn new(geometry: CalibratedSpiralGeometry, disc_type: DvdDiscType, sectors: u64) -> Self {
+    pub fn new(geometry: CorrectedSpiralGeometry, disc_type: DvdDiscType, sectors: u64) -> Self {
         let total_channel_words = sectors * PHYSICAL_SECTOR_CHANNEL_WORDS;
         let inv_total_channel_words: f64 = 1.0 / total_channel_words as f64;
 
@@ -176,7 +176,7 @@ impl DvdDisc {
         }
     }
 
-    #[inline] pub fn geometry(&self) -> &CalibratedSpiralGeometry { &self.geometry }
+    #[inline] pub fn geometry(&self) -> &CorrectedSpiralGeometry { &self.geometry }
     #[inline] pub fn disc_type(&self) -> &DvdDiscType { &self.disc_type }
     #[inline] pub fn sectors(&self) -> u64 { self.capacity_sectors }
 

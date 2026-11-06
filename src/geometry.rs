@@ -1,5 +1,7 @@
 use std::{f64::consts::{PI, TAU}, fmt};
 
+use crate::profile::GeometryProfile;
+
 /// Polar coordination of (r, rev)
 pub type PolarCoord = (f64, f64);
 
@@ -87,17 +89,25 @@ impl fmt::Display for InterpolationMethod {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExtrapolationMethod {
+    Clamp
+}
+
+impl fmt::Display for ExtrapolationMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExtrapolationMethod::Clamp => write!(f, "Clamp"),
+        }
+    }
+}
+
 /// Use phase samples with interpolation for correction
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhaseCorrectionInterpolation {
     pub samples: Vec<PhaseSample>,
     pub interpolation: InterpolationMethod
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ExtrapolationMethod {
-    Clamp
 }
 
 impl PhaseCorrectionInterpolation {
@@ -265,14 +275,14 @@ impl PhaseCorrection {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct CalibratedSpiralGeometry {
+pub struct CorrectedSpiralGeometry {
     /// Radius in milimeter
     pub geometry: SpiralGeometry,
     /// Calibration Data
     pub phase_correction: Option<PhaseCorrection>
 }
 
-impl CalibratedSpiralGeometry {
+impl CorrectedSpiralGeometry {
     #[inline]
     pub fn polar_at_pos(&self, pos: f64) -> PolarCoord {
         let (r, rev) = self.geometry.polar_at_pos(pos);

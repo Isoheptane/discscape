@@ -8,7 +8,7 @@ use discscape::dither::Dither;
 use discscape::dvd::{self, DvdDisc};
 use discscape::profile::{CorrectionProfile, DiscFamily, DiscProfile, DiscType};
 use discscape::picture::DiscPicture;
-use discscape::geometry::{CalibratedSpiralGeometry, PhaseCorrection, PhaseCorrectionInterpolation, PhaseSample, SpiralGeometry};
+use discscape::geometry::{CorrectedSpiralGeometry, PhaseCorrection, PhaseCorrectionInterpolation, PhaseSample, SpiralGeometry};
 use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -112,7 +112,7 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
         PhaseCorrection::Lut(lut)
     });
 
-    let geometry = CalibratedSpiralGeometry {
+    let geometry = CorrectedSpiralGeometry {
         geometry,
         phase_correction: correction,
     };
