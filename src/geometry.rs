@@ -1,7 +1,7 @@
 use std::fmt;
 use std::f64::consts::{PI, TAU};
 
-use crate::profile::{CorrectionInterpolationProfile, GeometryProfile, ProfileError};
+use crate::profile::{CorrectionInterpolationProfile, CorrectionProfile, GeometryProfile, ProfileError};
 
 /// Polar coordination of (r, rev)
 pub type PolarCoord = (f64, f64);
@@ -245,24 +245,21 @@ impl TryFrom<CorrectionInterpolationProfile> for PhaseCorrectionInterpolation {
             correction_rev: v[1],
         }).collect();
 
-        if let Some((idx, s)) = samples.iter().enumerate().find(|(_, s)| {
-            !(s.radius_mm.is_finite() && s.radius_mm.is_sign_positive())
-        }) {
-            return Err(ProfileError::InvalidCorrectionSample {
-                parameter: "radius_mm",
-                value: s.radius_mm,
-                index: idx,
-            })
-        }
-
-        if let Some((idx, s)) = samples.iter().enumerate().find(|(_, s)| {
-            !s.correction_rev.is_finite()
-        }) {
-            return Err(ProfileError::InvalidCorrectionSample {
-                parameter: "correction_rev",
-                value: s.correction_rev,
-                index: idx,
-            })
+        for (idx, s) in samples.iter().enumerate() {
+            if !(s.radius_mm.is_finite() && s.radius_mm.is_sign_positive()) {
+                return Err(ProfileError::InvalidCorrectionSample {
+                    parameter: "radius_mm",
+                    value: s.radius_mm,
+                    index: idx,
+                })
+            }
+            if !(s.correction_rev.is_finite()) {
+                return Err(ProfileError::InvalidCorrectionSample {
+                    parameter: "correction_rev",
+                    value: s.correction_rev,
+                    index: idx,
+                })
+            }
         }
 
         if !samples.windows(2).all(|w| {
@@ -328,7 +325,7 @@ impl PhaseCorrectionLut {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhaseCorrection {
-    Samples(PhaseCorrectionInterpolation),
+    Interpolation(PhaseCorrectionInterpolation),
     Lut(PhaseCorrectionLut),
 }
 
@@ -336,7 +333,7 @@ impl PhaseCorrection {
     #[inline]
     pub fn correction_rev(&self, radius_mm: f64) -> f64 {
         match self {
-            PhaseCorrection::Samples(curve) => curve.correction_rev(radius_mm),
+            PhaseCorrection::Interpolation(curve) => curve.correction_rev(radius_mm),
             PhaseCorrection::Lut(curve) => curve.correction_rev(radius_mm),
         }
     }
@@ -346,6 +343,19 @@ impl PhaseCorrection {
             PhaseCorrection::Lut(phase_correction_lut) => phase_correction_lut.clone(),
             _ => PhaseCorrectionLut::from_function(radius_min, radius_max, step_mm, |r| self.correction_rev(r))
         }
+    }
+}
+
+impl TryFrom<CorrectionProfile> for PhaseCorrection {
+    type Error = ProfileError;
+
+    fn try_from(value: CorrectionProfile) -> Result<Self, Self::Error> {
+        let correction = match value {
+            CorrectionProfile::Interpolation(interpo) => {
+                PhaseCorrection::Interpolation(PhaseCorrectionInterpolation::try_from(interpo)?)
+            }
+        };
+        Ok(correction)
     }
 }
 

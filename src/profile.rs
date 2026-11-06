@@ -142,8 +142,10 @@ pub enum ProfileError {
     InvalidGeometry { parameter: &'static str, value: f64 },
     #[error("Invalid correction sample '{parameter}' ({value}) at index {index}")]
     InvalidCorrectionSample { parameter: &'static str, value: f64, index: usize },
-    #[error("Invalid correction samples order")]
+    #[error("Correction sample radii must be strictly increasing")]
     InvalidCorrectionSamplesOrder,
     #[error("Insufficient correction samples {count}, {required} required")]
     InsufficientCorrectionSamples { count: usize, required: usize },
+    #[error("Invalid disc type {disc_type} for DVD")]
+    InvalidDvdDiscType { disc_type: DiscType },
 }

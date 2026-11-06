@@ -3,12 +3,12 @@ use std::io::{BufWriter, Write};
 
 use anyhow::Context;
 use clap::Args;
-use discscape::cd::{self, CdDisc};
+use discscape::cd::{self};
+use discscape::dvd::{self};
+use discscape::disc::Disc;
 use discscape::dither::Dither;
-use discscape::dvd::{self, DvdDisc};
-use discscape::profile::{CorrectionProfile, DiscFamily, DiscProfile, DiscType};
+use discscape::profile::DiscProfile;
 use discscape::picture::DiscPicture;
-use discscape::geometry::{CorrectedSpiralGeometry, PhaseCorrection, PhaseCorrectionInterpolation, SpiralGeometry};
 use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -62,8 +62,6 @@ pub enum RenderError {
     SectorOutOfBounds { end: u64, capacity: u64 },
     #[error("CD disc profile requires an output format. Please specify one using '--format <audio|mode1-2352|mode1-2048|mode2-2336>'")]
     MissingCdFormat,
-    #[error("Incompatible profile: DVD cannot have disc type {0:?}")]
-    InvalidDvdDiscType(DiscType),
 }
 
 pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
@@ -72,45 +70,17 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
     let profile: DiscProfile = serde_json::from_str(&profile_content)
         .with_context(|| format!("Failed to parse JSON in profile '{}'", args.profile.display()))?;
 
-    let disc = profile.disc;
+    let disc = Disc::try_from(profile)?;
+    let capacity = disc.sectors();
 
     let start_sector = args.start_sector.unwrap_or(0);
-    let end_sector = args.end_sector.unwrap_or(disc.capacity_sectors);
+    let end_sector = args.end_sector.unwrap_or(capacity);
     if start_sector >= end_sector {
         return Err(RenderError::InvalidSectorRange { start: start_sector, end: end_sector }.into())
     }
-    if end_sector > disc.capacity_sectors {
-        return Err(RenderError::SectorOutOfBounds { end: end_sector, capacity: disc.capacity_sectors }.into())
+    if end_sector > capacity {
+        return Err(RenderError::SectorOutOfBounds { end: end_sector, capacity }.into())
     }
-
-    let geometry = SpiralGeometry::new(
-        profile.geometry.r0_mm,
-        profile.geometry.pitch_um,
-        profile.geometry.n
-    );
-
-    let correction = match profile.correction {
-        Some(correction) => {
-            let correction = match correction {
-            CorrectionProfile::Interpolation(interpo) => {
-                    let interpo = PhaseCorrectionInterpolation::try_from(interpo)?;
-                    PhaseCorrection::Samples(interpo)
-                }
-            };
-            let lut = correction.to_lut(
-                geometry.r0_mm(), 
-                geometry.outer_radius_mm(), 
-                0.1
-            );
-            Some(PhaseCorrection::Lut(lut))
-        },
-        None => None,
-    };
-
-    let geometry = CorrectedSpiralGeometry {
-        geometry,
-        phase_correction: correction,
-    };
 
     let inner: Box<dyn Write> = if &args.output == "-" {
         Box::new(std::io::stdout().lock())
@@ -133,10 +103,9 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
 
     let dither = Dither::splitmix64(args.seed.unwrap_or(0x114514));
 
-    match DiscFamily::from(disc.disc_type) {
-        DiscFamily::Cd => {
+    match disc {
+        Disc::Cd(disc) => {
             let format = args.format.ok_or(RenderError::MissingCdFormat)?;
-            let disc = CdDisc::new(geometry, disc.capacity_sectors);
             match format {
                 CdFormat::Audio => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
@@ -160,20 +129,10 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
                 }
             }
         },
-        DiscFamily::Dvd => {
+        Disc::Dvd(disc) => {
             if let Some(fmt) = args.format {
                 eprintln!("[WARN] '--format {fmt:?}' is ignored because the loaded profile is for a DVD.");
             }
-
-            let disc_type = match disc.disc_type {
-                discscape::profile::DiscType::DvdMinusR => discscape::dvd::DvdDiscType::MinusR,
-                discscape::profile::DiscType::DvdPlusR => discscape::dvd::DvdDiscType::PlusR,
-                discscape::profile::DiscType::DvdMinusRw => discscape::dvd::DvdDiscType::MinusRw,
-                discscape::profile::DiscType::DvdPlusRw => discscape::dvd::DvdDiscType::PlusRw,
-                discscape::profile::DiscType::CdR |
-                discscape::profile::DiscType::CdRw => return Err(RenderError::InvalidDvdDiscType(disc.disc_type).into())
-            };
-            let disc = DvdDisc::new(geometry, disc_type, disc.capacity_sectors);
 
             render_sectors(&mut writer, start_sector, end_sector, |i|
                 dvd::generate_sector(&disc, &picture, &dither, i)

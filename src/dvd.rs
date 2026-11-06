@@ -2,6 +2,7 @@ use crate::picture::DiscPicture;
 use crate::geometry::{CorrectedSpiralGeometry, PolarCoord};
 use crate::efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity};
 use crate::dither::Dither;
+use crate::profile::{DiscType, ProfileError};
 
 
 pub const MAIN_DATA_SIZE: usize         = 2048;
@@ -148,6 +149,23 @@ impl DvdDiscType {
             DvdDiscType::MinusR => DVD_MINUS_R_SID_INFO_DEFAULT,
             DvdDiscType::MinusRw => DVD_MINUS_RW_SID_INFO_DEFAULT,
         }
+    }
+}
+
+impl TryFrom<DiscType> for DvdDiscType {
+    type Error = ProfileError;
+
+    fn try_from(value: DiscType) -> Result<Self, Self::Error> {
+        let value = match value {
+            DiscType::DvdMinusR => Self::MinusR,
+            DiscType::DvdPlusR => Self::PlusR,
+            DiscType::DvdMinusRw => Self::MinusRw,
+            DiscType::DvdPlusRw => Self::PlusRw,
+            DiscType::CdR | DiscType::CdRw => {
+                return Err(ProfileError::InvalidDvdDiscType { disc_type: value })
+            }
+        };
+        Ok(value)
     }
 }
 
