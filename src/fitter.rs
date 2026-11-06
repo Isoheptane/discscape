@@ -15,64 +15,67 @@ pub fn partial_derivative_s(geometry: &SpiralGeometry, s: f64) -> (f64, f64) {
 }
 
 pub fn fit_2(
-    cur: &SpiralGeometry,
+    init: &SpiralGeometry,
     error: &Vec<PhaseSample>,
     z_radius: f64
 ) -> SpiralGeometry {
     let count = error.len();
 
     let pos: Vec<f64> = error.iter()
-        .map(|s| cur.pos_at_radius(s.radius_mm)).collect();
+        .map(|s| init.pos_at_radius(s.radius_mm)).collect();
     let init_rev: Vec<f64> = pos.iter()
-        .map(|x| cur.polar_at_pos(*x).1).collect();
+        .map(|x| init.polar_at_pos(*x).1).collect();
     
-    let z_pos = cur.pos_at_radius(z_radius);
-    let z_init_rev = cur.polar_at_pos(z_pos).1;
+    let z_pos = init.pos_at_radius(z_radius);
+    let z_init_rev = init.polar_at_pos(z_pos).1;
 
-    let mut geometry = *cur;
+    // init_rev is the revolution count based on initial geometry
+
+    let mut geometry = *init;
+
+    let mut step_count = 0;
 
     loop {
-        let (dndn_z, dndp_z) = partial_derivative_s(&geometry, z_pos);
         let z_rev = geometry.polar_at_pos(z_pos).1;
-
-        let (dndn, dndp): (Vec<f64>, Vec<f64>) = pos.iter()
-            .map(|s| partial_derivative_s(&geometry, *s))
-            .unzip();
         let residual: Vec<f64> = (0..count).map(|i| {
             let corrected_i = geometry.polar_at_pos(pos[i]).1 - init_rev[i];
             let corrected_z = z_rev - z_init_rev;
             error[i].rev - (corrected_i - corrected_z)
         }).collect();
-        println!("residual: {:#?}", residual);
 
-        let mut num = 0.0; let mut denom = 0.0;
-        for i in 0..count {
-            let a = dndn[i] - dndn_z;
-            // let b = dndp[i] - dndp_z;
-            num += a * residual[i];
-            denom += a * a;
-        }
-        let delta_n = num / denom;
-        let mut num = 0.0; let mut denom = 0.0;
-        for i in 0..count {
-            let a = dndn[i] - dndn_z;
-            let b = dndp[i] - dndp_z;
-            num += b * (residual[i] - delta_n * a);
-            denom += b * b;
-        }
-        let delta_p = num / denom;
-        println!("delta_n: {} rev; delta_p: {} um", delta_n, delta_p * 1000.0);
+        println!("{:#?}", residual);
+
+        // Correction scal of N and p relative to r_z
+        let (z_dndn, z_dndp) = partial_derivative_s(&geometry, z_pos);
+        let (cn, cp): (Vec<f64>, Vec<f64>) = (0..count).map(|i|{
+            let (dndn, dndp) = partial_derivative_s(&geometry, pos[i]);
+            (dndn - z_dndn, dndp - z_dndp)
+        }).unzip();
+        let s11: f64 = cn.iter().map(|cni| cni * cni).sum();
+        let s22: f64 = cp.iter().map(|cpi| cpi * cpi).sum();
+        let s12: f64 = (0..count).map(|i| cn[i] * cp[i]).sum();
+        let pn: f64 = (0..count).map(|i| cn[i] * residual[i]).sum();
+        let pp: f64 = (0..count).map(|i| cp[i] * residual[i]).sum();
+        let det: f64 = s11 * s22 - (s12 * s12);
+        
+        let dn: f64 = (pn * s22 - pp * s12) / det;
+        let dp: f64 = (pp * s11 - pn * s12) / det;
+
+        println!("Delta-N: {:+}; Delta-p: {:+} um", dn, dp * 1000.0);
 
         geometry = SpiralGeometry::new(
             geometry.r0_mm(),
-            geometry.pitch_um() + delta_p * 1000.0,
-            geometry.revolutions() + delta_n
+            geometry.pitch_um() + dp * 1000.0,
+            geometry.revolutions() + dn
         );
+        
 
-        if delta_n.abs() < 1e-9 && delta_p.abs() < 1e-9 {
-            println!("Converged:");
-            println!("  Delta N: {}", geometry.revolutions() - cur.revolutions());
-            println!("  Delta P: {} um", geometry.pitch_um() - cur.pitch_um());
+        step_count += 1;
+
+        if dn.abs() < 1e-9 && dp.abs() < 1e-9 {
+            println!("Converged in {step_count} steps:");
+            println!("  Delta N: {:+.9}", geometry.revolutions() - init.revolutions());
+            println!("  Delta P: {:+.9} um", geometry.pitch_um() - init.pitch_um());
             println!("  Residual Error:\n{:#?}", residual);
             return geometry;
         }
@@ -80,7 +83,7 @@ pub fn fit_2(
 }
 
 
-pub fn fit(cur: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) -> Option<SpiralGeometry> {
+pub fn fit(init: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) -> Option<SpiralGeometry> {
 
     let pivot_index = error
         .iter()
@@ -89,13 +92,15 @@ pub fn fit(cur: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) ->
 
     let (x_list, base_err): (Vec<f64>, Vec<f64>) = error.into_iter()
         .map(|s| 
-            (cur.pos_at_radius(s.radius_mm), s.rev)
+            (init.pos_at_radius(s.radius_mm), s.rev)
         )
         .unzip();
 
-    let base_rev: Vec<f64> = x_list.iter().map(|x| cur.polar_at_pos(*x).1).collect();
+    let base_rev: Vec<f64> = x_list.iter().map(|x| init.polar_at_pos(*x).1).collect();
 
-    let mut geometry = *cur;
+    let mut geometry = *init;
+
+    let mut step_count = 0;
 
     loop {
         let err: Vec<f64> = x_list.iter()
@@ -104,7 +109,7 @@ pub fn fit(cur: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) ->
             .map(|((x, old_n), abs_err)| {
                 abs_err - (geometry.polar_at_pos(*x).1 - old_n)
             }).collect();
-        println!("Remaining error: {:#?}", err);
+        // println!("Remaining error: {:#?}", err);
 
         let r0 = geometry.r0_mm();
         let p = geometry.pitch_mm();
@@ -135,7 +140,7 @@ pub fn fit(cur: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) ->
         }).collect();
         
         let sum_basis: f64 = basis.iter().map(|x| x * x).sum();
-        let sum_ve: f64 = basis.iter().zip(resid_error).map(|(v, e)| v * e).sum();
+        let sum_ve: f64 = basis.iter().zip(resid_error.iter()).map(|(v, e)| v * e).sum();
 
         let dp = sum_ve / sum_basis;
         let dn = dnf(dp);
@@ -146,12 +151,19 @@ pub fn fit(cur: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) ->
             rev + dn
         );
 
-        println!("Delta-N = {dn:.6}, Delta-p = {:.9} um", dp * 1000.0);
+        // println!("Delta-N = {dn:.6}, Delta-p = {:.9} um", dp * 1000.0);
 
         geometry = new_geometry;
 
-        if dn.abs() < 1e-9 && dp.abs() < 1e-9 {
-            return Some(geometry)
+        step_count += 1;
+        
+
+        if dn.abs() < 1e-9 && dp.abs() < 1e-12 {
+            println!("Converged in {step_count} steps:");
+            println!("  Delta N: {}", geometry.revolutions() - init.revolutions());
+            println!("  Delta P: {} um", geometry.pitch_um() - init.pitch_um());
+            println!("  Residual Error:\n{:#?}", resid_error);
+            return Some(geometry);
         }
         
     }
