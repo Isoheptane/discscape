@@ -1,23 +1,9 @@
-
 use anyhow::Context;
-use clap::{Subcommand, Args};
+use clap::Args;
 use discscape::geometry::correction::PhaseCorrection;
 use discscape::profile::DiscProfile;
 use discscape::disc::Disc;
 use serde_json::Value;
-
-#[derive(Subcommand)]
-pub enum ProfileCommands {
-    Show(ProfileShowArgs)
-}
-
-pub fn profile_command(cmd: ProfileCommands) -> anyhow::Result<()> {
-    match cmd {
-        ProfileCommands::Show(args) => {
-            profile_show_command(args)
-        }
-    }
-}
 
 #[derive(Args)]
 pub struct ProfileShowArgs {
