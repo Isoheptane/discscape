@@ -206,7 +206,7 @@ pub fn generate_sector(
     // Here we only omit end 12 words to make it divisible to 6;
     
     const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
-    const IMAGE_SAMPLES_LEN: usize = (SYNC_FRAME_CHANNEL_WORDS as usize * 24 - 12) / 6;
+    const IMAGE_SAMPLES_LEN: usize = (SYNC_FRAME_CHANNEL_WORDS as usize * 24 - 12) / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
 
     let mut image_samples = [0u8; IMAGE_SAMPLES_LEN];
 
