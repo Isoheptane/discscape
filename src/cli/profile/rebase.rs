@@ -20,6 +20,7 @@ pub struct ProfileRebaseArgs {
     #[arg(short = 'u', long = "unconstrained")]
     unconstrained: bool,
 
+    #[arg(long = "drop-correction")]
     /// Drop correction in output profile
     drop_correction: bool
 }
