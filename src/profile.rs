@@ -1,6 +1,8 @@
 use std::fmt;
 
-use crate::{disc::{CdDisc, Disc, DvdDisc, DvdDiscType}, geometry::{CorrectedSpiralGeometry, PhaseSample, SpiralGeometry, correction::{ExtrapolationMethod, InterpolationMethod, PhaseCorrection, PhaseCorrectionInterpolation}}};
+use crate::geometry::correction::{ExtrapolationMethod, InterpolationMethod, PhaseCorrection, PhaseCorrectionInterpolation};
+use crate::geometry::{CorrectedSpiralGeometry, PhaseSample, SpiralGeometry};
+use crate::disc::{CdDisc, Disc, DvdDisc, DvdDiscType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiscFamily {
@@ -90,6 +92,16 @@ impl TryFrom<GeometryProfile> for SpiralGeometry {
     }
 }
 
+impl From<SpiralGeometry> for GeometryProfile {
+    fn from(value: SpiralGeometry) -> Self {
+        Self {
+            r0_mm: value.r0_mm(),
+            pitch_um: value.pitch_um(),
+            n: value.revolutions(),
+        }
+    }
+}
+
 /*
     General Correction Profile
 */
@@ -110,6 +122,16 @@ impl TryFrom<CorrectionProfile> for PhaseCorrection {
             }
         };
         Ok(correction)
+    }
+}
+
+impl From<PhaseCorrection> for CorrectionProfile {
+    fn from(value: PhaseCorrection) -> Self {
+        match value {
+            PhaseCorrection::Interpolation(interpo) =>
+                CorrectionProfile::Interpolation(CorrectionInterpolationProfile::from(interpo)),
+            PhaseCorrection::Lut(_) => unimplemented!(),
+        }
     }
 }
 
@@ -162,6 +184,20 @@ impl TryFrom<CorrectionInterpolationProfile> for PhaseCorrectionInterpolation {
         Ok(PhaseCorrectionInterpolation::new(
             samples, value.method, value.extrapolation
         ))
+    }
+}
+
+impl From<PhaseCorrectionInterpolation> for CorrectionInterpolationProfile {
+    fn from(value: PhaseCorrectionInterpolation) -> Self {
+        let samples = value.samples;
+        let samples: Vec<[f64; 2]> = samples.into_iter()
+            .map(|s| [s.radius_mm, s.rev])
+            .collect();
+        Self {
+            method: value.interpolation,
+            extrapolation: value.extrapolation,
+            samples: samples,
+        }
     }
 }
 
