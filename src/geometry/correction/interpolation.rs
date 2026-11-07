@@ -1,6 +1,5 @@
 use std::fmt;
 
-use crate::profile::{CorrectionInterpolationProfile, ProfileError};
 use crate::geometry::PhaseSample;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -55,6 +54,9 @@ impl PhaseCorrectionInterpolation {
                 ExtrapolationMethod::Zero => return 0.0,
                 ExtrapolationMethod::Clamp => return samples[0].rev,
                 ExtrapolationMethod::Linear => {
+                    if samples.len() < 2 {
+                        return samples[0].rev;
+                    }
                     let slope = (samples[1].rev - samples[0].rev) 
                         / (samples[1].radius_mm - samples[0].radius_mm);
                     return samples[0].rev + (radius_mm - samples[0].radius_mm) * slope;
@@ -66,6 +68,9 @@ impl PhaseCorrectionInterpolation {
                 ExtrapolationMethod::Zero => return 0.0,
                 ExtrapolationMethod::Clamp => return samples[i - 1].rev,
                 ExtrapolationMethod::Linear => {
+                    if samples.len() < 2 {
+                        return samples[0].rev;
+                    }
                     let slope = (samples[i - 1].rev - samples[i - 2].rev) 
                         / (samples[i - 1].radius_mm - samples[i - 2].radius_mm);
                     return samples[i - 1].rev + (radius_mm - samples[i - 1].radius_mm) * slope;
@@ -99,44 +104,5 @@ impl PhaseCorrectionInterpolation {
             interpolation,
             extrapolation,
         }
-    }
-}
-
-impl TryFrom<CorrectionInterpolationProfile> for PhaseCorrectionInterpolation {
-    type Error = ProfileError;
-
-    fn try_from(value: CorrectionInterpolationProfile) -> Result<Self, Self::Error> {
-        // Check Samples
-        let samples: Vec<PhaseSample> = value
-            .samples
-            .into_iter()
-            .map(|v| PhaseSample {
-                radius_mm: v[0],
-                rev: v[1],
-            })
-            .collect();
-
-        for (idx, s) in samples.iter().enumerate() {
-            if !(s.radius_mm.is_finite() && s.radius_mm > 0.0) {
-                return Err(ProfileError::InvalidCorrectionSample {
-                    parameter: "radius_mm",
-                    value: s.radius_mm,
-                    index: idx,
-                });
-            }
-            if !(s.rev.is_finite()) {
-                return Err(ProfileError::InvalidCorrectionSample {
-                    parameter: "correction_rev",
-                    value: s.rev,
-                    index: idx,
-                });
-            }
-        }
-
-        if !samples.windows(2).all(|w| w[0].radius_mm < w[1].radius_mm) {
-            return Err(ProfileError::InvalidCorrectionSamplesOrder);
-        }
-
-        Ok(Self::new(samples, value.method, value.extrapolation))
     }
 }

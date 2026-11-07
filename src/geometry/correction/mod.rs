@@ -1,5 +1,3 @@
-use crate::profile::{CorrectionProfile, ProfileError};
-
 pub mod interpolation;
 pub mod lut;
 
@@ -26,18 +24,5 @@ impl PhaseCorrection {
             PhaseCorrection::Lut(phase_correction_lut) => phase_correction_lut.clone(),
             _ => PhaseCorrectionLut::from_function(radius_min, radius_max, step_mm, |r| self.correction_rev(r))
         }
-    }
-}
-
-impl TryFrom<CorrectionProfile> for PhaseCorrection {
-    type Error = ProfileError;
-
-    fn try_from(value: CorrectionProfile) -> Result<Self, Self::Error> {
-        let correction = match value {
-            CorrectionProfile::Interpolation(interpo) => {
-                PhaseCorrection::Interpolation(PhaseCorrectionInterpolation::try_from(interpo)?)
-            }
-        };
-        Ok(correction)
     }
 }

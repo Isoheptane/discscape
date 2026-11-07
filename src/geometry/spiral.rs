@@ -1,6 +1,5 @@
 use std::f64::consts::{PI, TAU};
 
-use crate::profile::{GeometryProfile, ProfileError};
 use crate::geometry::PolarCoord;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -64,21 +63,5 @@ impl SpiralGeometry {
         let rev = theta / TAU;
         let length = theta * (self.r0 + self.p_mm * rev / 2.0);
         return length / self.total_length;
-    }
-}
-
-impl TryFrom<GeometryProfile> for SpiralGeometry {
-    type Error = ProfileError;
-    fn try_from(value: GeometryProfile) -> Result<Self, Self::Error> {
-        for (parameter, value) in [
-            ("r0_mm", value.r0_mm),
-            ("pitch_um", value.pitch_um),
-            ("n", value.n),
-        ] {
-            if !(value.is_finite() && value > 0.0) {
-                return Err(ProfileError::InvalidGeometry { parameter, value })
-            }
-        }
-        Ok(Self::new(value.r0_mm, value.pitch_um, value.n))
     }
 }

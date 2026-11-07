@@ -5,38 +5,11 @@ pub use cd::{*};
 pub use dvd::{*};
 
 use crate::geometry::CorrectedSpiralGeometry;
-use crate::profile::{DiscProfile, DiscType, ProfileError};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Disc {
     Cd(CdDisc),
     Dvd(DvdDisc)
-}
-
-impl TryFrom<DiscProfile> for Disc {
-    type Error = ProfileError;
-    
-    fn try_from(profile: DiscProfile) -> Result<Self, Self::Error> {
-        let geometry = profile.build_geometry()?;
-
-        match profile.disc.disc_type {
-            DiscType::CdR | DiscType::CdRw => {
-                Ok(Disc::Cd(CdDisc::new(
-                    geometry, profile.disc.capacity_sectors
-                )))
-            }
-            disc_type => {
-                let dvd_type = DvdDiscType::try_from(disc_type)?;
-
-                Ok(Disc::Dvd(DvdDisc::new(
-                    geometry,
-                    dvd_type,
-                    profile.disc.capacity_sectors
-                )))
-            }
-        }
-    }
-    
 }
 
 impl Disc {
