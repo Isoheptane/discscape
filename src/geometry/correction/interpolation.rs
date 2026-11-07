@@ -57,7 +57,7 @@ impl PhaseCorrectionInterpolation {
                 ExtrapolationMethod::Linear => {
                     let slope = (samples[1].rev - samples[0].rev) 
                         / (samples[1].radius_mm - samples[0].radius_mm);
-                    return (radius_mm - samples[0].radius_mm) * slope;
+                    return samples[0].rev + (radius_mm - samples[0].radius_mm) * slope;
                 },
             }
         }
@@ -68,7 +68,7 @@ impl PhaseCorrectionInterpolation {
                 ExtrapolationMethod::Linear => {
                     let slope = (samples[i - 1].rev - samples[i - 2].rev) 
                         / (samples[i - 1].radius_mm - samples[i - 2].radius_mm);
-                    return (radius_mm - samples[i - 1].radius_mm) * slope;
+                    return samples[i - 1].rev + (radius_mm - samples[i - 1].radius_mm) * slope;
                 },
             }
         }
