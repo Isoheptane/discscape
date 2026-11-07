@@ -7,8 +7,11 @@ use discscape::profile::{CorrectionProfile, DiscProfile};
 
 #[derive(Args)]
 pub struct ProfileScaleArgs {
+    /// Path to the input disc profile document
     profile: String,
+    /// Path to the output profile. Use '-' for output to stdout
     output: String,
+    /// Scale factor
     factor: f64
 }
 
