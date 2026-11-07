@@ -3,7 +3,10 @@ use std::fs::File;
 
 use anyhow::Context;
 use clap::Args;
-use discscape::{fitter::{FittingError, fit_p_fixed_rev, fit_rev_p}, geometry::{PhaseSample, SpiralGeometry, correction::{PhaseCorrection, PhaseCorrectionInterpolation}}, profile::{CorrectionProfile, DiscProfile, GeometryProfile}};
+use discscape::profile::{CorrectionProfile, DiscProfile, GeometryProfile};
+use discscape::geometry::{PhaseSample, SpiralGeometry};
+use discscape::geometry::correction::{PhaseCorrection, PhaseCorrectionInterpolation};
+use discscape::fitter::{FittingError, fit_p_fixed_rev, fit_rev_p};
 
 #[derive(Args)]
 pub struct ProfileRebaseArgs {
@@ -51,6 +54,30 @@ pub fn profile_rebase_command(args: ProfileRebaseArgs) -> anyhow::Result<()> {
         },
         _ => unimplemented!(),
     };
+
+    let delta_n = new_geometry.revolutions() - geometry.revolutions();
+    let delta_p = new_geometry.pitch_um() - geometry.pitch_um();
+    let delta_rend = new_geometry.outer_radius_mm() - geometry.outer_radius_mm();
+
+    eprintln!("Geometry");
+    eprintln!("  Track Pitch:        {:.9} µm  ({:+.9} µm)"  , geometry.pitch_um(), delta_p);
+    eprintln!("  Revolutions:        {:.6} rev ({:+.6} rev)" , geometry.revolutions(), delta_n);
+    eprintln!("  End Radius:         {:.3} mm  ({:+.3} mm)"  , geometry.outer_radius_mm(), delta_rend);
+    eprintln!();
+
+    if let PhaseCorrection::Interpolation(interpo) = &new_correction {
+        let max_abs: f64 = interpo.samples.iter()
+            .map(|s| s.rev.abs())
+            .fold(f64::NEG_INFINITY, f64::max);
+        let sum_sq: f64 = interpo.samples.iter()
+            .map(|s| s.rev * s.rev)
+            .sum();
+        let rms = sum_sq / interpo.samples.len() as f64;
+
+        eprintln!("Correction");
+        eprintln!("  Max Correction:        {:+.6} rev", max_abs);
+        eprintln!("  Correction RMS:        {:.6} rev", rms);
+    }
 
     profile.geometry = GeometryProfile::from(new_geometry);
     profile.correction = if args.drop_correction {
