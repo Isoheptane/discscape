@@ -1,3 +1,5 @@
+use std::{fs::File, io::Write};
+
 use anyhow::Context;
 use clap::Args;
 use discscape::profile::{CorrectionProfile, DiscProfile};
@@ -30,7 +32,11 @@ pub fn profile_scale_command(args: ProfileScaleArgs) -> anyhow::Result<()> {
         }
     }
 
-    println!("{}", serde_json::to_string_pretty(&profile)?);
+    let profile_content = serde_json::to_string_pretty(&profile)?;
+    let mut file = File::create_new(&args.output)
+        .with_context(|| format!("Failed to open profile file '{}'", args.output))?;
+    file.write_all(profile_content.as_bytes())
+        .with_context(|| format!("Failed to write profile file '{}'", args.output))?;
 
     Ok(())
 }
