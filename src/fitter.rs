@@ -19,7 +19,7 @@ pub enum FittingError {
     SingularMatrix,
 }
 
-/// Fitting a geometry's p and N to error
+/// Fitting a geometry's p and N to error with minimal square error sum
 pub fn fit_rev_p(
     init: SpiralGeometry,
     error: &[PhaseSample],
@@ -30,12 +30,11 @@ pub fn fit_rev_p(
     let pos: Vec<f64> = error.iter()
         .map(|s| init.pos_at_radius(s.radius_mm))
         .collect();
+    let z_pos = init.pos_at_radius(z_radius);
 
     let init_rev: Vec<f64> = pos.iter()
         .map(|x| init.polar_at_pos(*x).1)
         .collect();
-
-    let z_pos = init.pos_at_radius(z_radius);
     let z_init_rev = init.polar_at_pos(z_pos).1;
 
     let mut geometry = init;
@@ -104,89 +103,77 @@ pub fn fit_rev_p(
     Err(FittingError::ConvergeFailed { max_iter: MAX_ITER as u64 })
 }
 
+/// Fitting a geometry's p to error with minimal square error sum and 
+pub fn fit_p_fixed_rev(
+    init: SpiralGeometry,
+    error: &[PhaseSample],
+    z_radius: f64,
+    delta_n: f64,
+) -> Result<(SpiralGeometry, Vec<PhaseSample>), FittingError> {
+    let count = error.len();
 
-pub fn fit(init: &SpiralGeometry, error: &Vec<PhaseSample>, pivot_radius: f64) -> Option<SpiralGeometry> {
+    let pos: Vec<f64> = error.iter()
+        .map(|s| init.pos_at_radius(s.radius_mm))
+        .collect();
+    let z_pos = init.pos_at_radius(z_radius);
 
-    let pivot_index = error
-        .iter()
-        .enumerate()
-        .find(|(_, sample)| sample.radius_mm == pivot_radius)?.0;
+    let n_fixed_geometry = SpiralGeometry::new(
+        init.r0_mm(),
+        init.pitch_um(),
+        init.revolutions() + delta_n
+    );
 
-    let (x_list, base_err): (Vec<f64>, Vec<f64>) = error.into_iter()
-        .map(|s| 
-            (init.pos_at_radius(s.radius_mm), s.rev)
-        )
-        .unzip();
+    let init_rev: Vec<f64> = pos.iter()
+        .map(|x| init.polar_at_pos(*x).1)
+        .collect();
+    let z_init_rev = init.polar_at_pos(z_pos).1;
 
-    let base_rev: Vec<f64> = x_list.iter().map(|x| init.polar_at_pos(*x).1).collect();
+    let mut geometry = n_fixed_geometry;
 
-    let mut geometry = *init;
+    let mut residual = error.to_vec();
 
-    let mut step_count = 0;
+    const MAX_ITER: usize = 128;
+    for _step_iter in 1..=MAX_ITER {
+        let z_rev = geometry.polar_at_pos(z_pos).1;
+        let z_correction = z_rev - z_init_rev;
+        let (_, z_dndp) = partial_derivative_s(&geometry, z_pos);
 
-    loop {
-        let err: Vec<f64> = x_list.iter()
-            .zip(base_rev.iter())
-            .zip(base_err.iter())
-            .map(|((x, old_n), abs_err)| {
-                abs_err - (geometry.polar_at_pos(*x).1 - old_n)
-            }).collect();
-        // println!("Remaining error: {:#?}", err);
+        let mut num = 0.0;
+        let mut denom = 0.0;
 
-        let r0 = geometry.r0_mm();
-        let p = geometry.pitch_mm();
-        let rev = geometry.revolutions();
-        // Derivative n/N and n/p
-        let (u, v): (Vec<f64>, Vec<f64>) = x_list.iter().map(|x| {
-            let (r, n) = geometry.polar_at_pos(*x);
-            let tn = (r0 + p * rev) * x / r;
-            let tp = (rev * tn - n) / p;
-            (tn, tp)
-        })
-        .unzip();
+        for i in 0..count {
+            let (_, dndp) = partial_derivative_s(&geometry, pos[i]);
+            let i_correction = geometry.polar_at_pos(pos[i]).1 - init_rev[i];
 
-        let uk = u[pivot_index];
-        let vk = v[pivot_index];
-        let ek = err[pivot_index];
+            residual[i].rev = error[i].rev - (i_correction - z_correction);
+            // Pre-divide sensitivity , unit becomes N/um instead of N/mm
+            let cp_um = (dndp - z_dndp) / 1000.0;
 
-        let dnf = |p: f64| -> f64 {
-            (ek - vk * p) / uk
-        };
-        
-        let basis: Vec<f64> = u.iter().zip(v).map(|(ui, vi)| -> f64 {
-            vi - (ui * vk / uk)
-        }).collect();
+            num += residual[i].rev * cp_um;
+            denom += cp_um * cp_um;
+        }
 
-        let resid_error: Vec<f64> = err.iter().zip(u).map(|(err, ui)| -> f64 {
-            err - (ui * ek / uk)
-        }).collect();
-        
-        let sum_basis: f64 = basis.iter().map(|x| x * x).sum();
-        let sum_ve: f64 = basis.iter().zip(resid_error.iter()).map(|(v, e)| v * e).sum();
+        let dp_um = num / denom;
 
-        let dp = sum_ve / sum_basis;
-        let dn = dnf(dp);
+        println!("dp={dp_um}");
 
-        let new_geometry = SpiralGeometry::new(
-            r0,
-            geometry.pitch_um() + dp * 1000.0,
-            rev + dn
+        // println!("{:#?}", residual);
+        // println!("Delta-N: {:+}; Delta-p: {:+} nm", dn, dp * 1000000.0);
+
+        geometry = SpiralGeometry::new(
+            geometry.r0_mm(),
+            geometry.pitch_um() + dp_um,
+            geometry.revolutions()
         );
 
-        // println!("Delta-N = {dn:.6}, Delta-p = {:.9} um", dp * 1000.0);
-
-        geometry = new_geometry;
-
-        step_count += 1;
-        
-
-        if dn.abs() < 1e-9 && dp.abs() < 1e-12 {
-            println!("Converged in {step_count} steps:");
-            println!("  Delta N: {}", geometry.revolutions() - init.revolutions());
-            println!("  Delta P: {} um", geometry.pitch_um() - init.pitch_um());
-            println!("  Residual Error:\n{:#?}", resid_error);
-            return Some(geometry);
+        if dp_um.abs() < 1e-9 {
+            // println!("Converged in {step_iter} iterations:");
+            // println!("  Delta N: {:+.9}", geometry.revolutions() - init.revolutions());
+            // println!("  Delta P: {:+.9} um", geometry.pitch_um() - init.pitch_um());
+            // println!("  Residual Error:\n{:#?}", residual);
+            return Ok((geometry, residual));
         }
-        
     }
+
+    Err(FittingError::ConvergeFailed { max_iter: MAX_ITER as u64 })
 }
