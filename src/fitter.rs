@@ -80,7 +80,7 @@ pub fn fit_rev_p(
         let dn: f64 = (pn * s22 - pp_um * s12) / det;
         let dp_um: f64 = (pp_um * s11 - pn * s12) / det;
 
-        println!("det={det}, dn={dn}, dp={dp_um}");
+        // println!("det={det}, dn={dn}, dp={dp_um}");
 
         // println!("{:#?}", residual);
         // println!("Delta-N: {:+}; Delta-p: {:+} nm", dn, dp * 1000000.0);
@@ -155,7 +155,7 @@ pub fn fit_p_fixed_rev(
 
         let dp_um = num / denom;
 
-        println!("dp={dp_um}");
+        // println!("dp={dp_um}");
 
         // println!("{:#?}", residual);
         // println!("Delta-N: {:+}; Delta-p: {:+} nm", dn, dp * 1000000.0);

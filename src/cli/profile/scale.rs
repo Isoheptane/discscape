@@ -1,4 +1,5 @@
-use std::{fs::File, io::Write};
+use std::io::Write;
+use std::fs::File;
 
 use anyhow::Context;
 use clap::Args;
@@ -32,11 +33,15 @@ pub fn profile_scale_command(args: ProfileScaleArgs) -> anyhow::Result<()> {
         }
     }
 
-    let profile_content = serde_json::to_string_pretty(&profile)?;
-    let mut file = File::create_new(&args.output)
-        .with_context(|| format!("Failed to open profile file '{}'", args.output))?;
-    file.write_all(profile_content.as_bytes())
-        .with_context(|| format!("Failed to write profile file '{}'", args.output))?;
+    let inner: Box<dyn Write> = if &args.output == "-" {
+        Box::new(std::io::stdout().lock())
+    } else {
+        let file = File::create_new(&args.output)
+            .with_context(|| format!("Failed to create or open output file '{}'", args.output))?;
+        Box::new(file)
+    };
+    serde_json::to_writer_pretty(inner, &profile)
+        .with_context(|| format!("Failed to profile to file '{}'", args.output))?;
 
     Ok(())
 }
