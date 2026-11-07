@@ -1,4 +1,4 @@
-## discscape
+# discscape
 Renders images as visible patterns on the data side of optical discs (currently CD and DVD).
 
 This is an independent implementation, not affiliated with any third-party project.
@@ -14,17 +14,17 @@ cargo run --release -- --help
 ### Render
 Render an image using JSON disc profile
 ```bash
-discscape render picture.png data.iso --profile disc.json
+discscape render picture.png image.iso --profile disc_profile.json
 ```
 
 For CD, specify the output sector format
 ```bash
-discscape render picture.png data.bin --profile disc.json --format audio
+discscape render picture.png image.bin --profile disc_profile.json --format audio
 ```
 
 To write the generated data to standard output, use `-` for output filename:
 ```bash
-discscape render picture.png - --profile disc.json
+discscape render picture.png - --profile disc_profile.json
 ```
 
 ### Disc Profiles
@@ -32,7 +32,20 @@ A disc profile is a JSON document describing the recoding medium, spiral geometr
 
 To inspect a profile and view its derived geometry information:
 ```
-discscape profile show disc.json
+discscape profile show disc_profile.json
+```
+
+## Burning Discs
+### DVD
+You can generate a .iso image and then write to a DVD using `growisofs`
+```bash
+discscape render picture.png image.iso --profile disc_profile.json
+growisofs -dvd-compat -Z /dev/sr0=image.iso
+```
+
+Or, you can use pipe command to pipe data to `growisofs`
+```bash
+discscape render picture.png - --profile disc_profile.json | growisofs -dvd-compat -Z /dev/sr0=/dev/stdin
 ```
 
 ## Documentation
