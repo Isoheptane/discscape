@@ -20,13 +20,17 @@ impl fmt::Display for InterpolationMethod {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ExtrapolationMethod {
+    Zero,
     Clamp,
+    Linear,
 }
 
 impl fmt::Display for ExtrapolationMethod {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ExtrapolationMethod::Zero => write!(f, "Zero"),
             ExtrapolationMethod::Clamp => write!(f, "Clamp"),
+            ExtrapolationMethod::Linear => write!(f, "Linear"),
         }
     }
 }
@@ -43,20 +47,29 @@ impl PhaseCorrectionInterpolation {
     #[inline]
     fn linear(&self, radius_mm: f64) -> f64 {
         let samples = &self.samples;
-        if samples.is_empty() {
-            return 0.0;
-        }
 
         let i = samples.partition_point(|v| v.radius_mm < radius_mm);
 
         if i == 0 {
             match self.extrapolation {
+                ExtrapolationMethod::Zero => return 0.0,
                 ExtrapolationMethod::Clamp => return samples[0].rev,
+                ExtrapolationMethod::Linear => {
+                    let slope = (samples[1].rev - samples[0].rev) 
+                        / (samples[1].radius_mm - samples[0].radius_mm);
+                    return (radius_mm - samples[0].radius_mm) * slope;
+                },
             }
         }
         if i == samples.len() {
             match self.extrapolation {
+                ExtrapolationMethod::Zero => return 0.0,
                 ExtrapolationMethod::Clamp => return samples[i - 1].rev,
+                ExtrapolationMethod::Linear => {
+                    let slope = (samples[i - 1].rev - samples[i - 2].rev) 
+                        / (samples[i - 1].radius_mm - samples[i - 2].radius_mm);
+                    return (radius_mm - samples[i - 1].radius_mm) * slope;
+                },
             }
         }
 
@@ -64,73 +77,6 @@ impl PhaseCorrectionInterpolation {
         let b = samples[i];
         let t = (radius_mm - a.radius_mm) / (b.radius_mm - a.radius_mm);
         a.rev + t * (b.rev - a.rev)
-    }
-
-    #[allow(dead_code)]
-    #[inline]
-    fn pchip(&self, radius_mm: f64) -> f64 {
-        let samples = &self.samples;
-        if samples.len() < 2 {
-            return 0.0;
-        }
-        let i = samples.partition_point(|v| v.radius_mm < radius_mm);
-
-        if i == 0 {
-            match self.extrapolation {
-                ExtrapolationMethod::Clamp => return samples[0].rev,
-            }
-        }
-        if i == samples.len() {
-            match self.extrapolation {
-                ExtrapolationMethod::Clamp => return samples[i - 1].rev,
-            }
-        }
-
-        let x0 = samples[i - 1].radius_mm;
-        let x1 = samples[i].radius_mm;
-        let y0 = samples[i - 1].rev;
-        let y1 = samples[i].rev;
-        let h = x1 - x0;
-        let t = (radius_mm - x0) / h;
-
-        if samples.len() == 2 {
-            return y0 + t * (y1 - y0);
-        }
-
-        let secant = |j: usize| -> f64 {
-            (samples[j + 1].rev - samples[j].rev)
-                / (samples[j + 1].radius_mm - samples[j].radius_mm)
-        };
-
-        let deriv = |k: usize| -> f64 {
-            if k == 0 {
-                return secant(0);
-            };
-            if k == samples.len() - 1 {
-                return secant(k - 1);
-            };
-            let a = secant(k - 1);
-            let b = secant(k);
-            if a * b <= 0.0 {
-                return 0.0;
-            } // Flat derivative for local ext
-            let hp = samples[k].radius_mm - samples[k - 1].radius_mm;
-            let hn = samples[k + 1].radius_mm - samples[k].radius_mm;
-            let w1 = 2.0 * hn + hp;
-            let w2 = hn + 2.0 * hp;
-            (w1 + w2) / (w1 / a + w2 / b)
-        };
-
-        let d0 = deriv(i - 1);
-        let d1 = deriv(i);
-
-        let t2 = t * t;
-        let t3 = t2 * t;
-
-        y0 * (2.0 * t3 - 3.0 * t2 + 1.0)
-            + h * d0 * (t3 - 2.0 * t2 + t)
-            + y1 * (-2.0 * t3 + 3.0 * t2)
-            + h * d1 * (t3 - t2)
     }
 
     #[inline]
