@@ -1,9 +1,12 @@
 # discscape
-Renders images as visible patterns on the data side of optical discs (currently CD and DVD).
+
+Renders images as visible patterns on the recording side of optical discs (currently CD and DVD).
+
+discscape supports configurable disc profiles, spiral geometry calibration, and phase correction to compensate for recording geometry errors.
 
 This is an independent implementation, not affiliated with any third-party project.
 
-**discscape is experimental and under development.** The command-line interface is available in the source code, but no prebuilt executables are provided. Some features are incomplete, and generated images should be treated as experimental.
+**discscape is experimental and under development.** ...
 
 ## Usage
 Build and run from source with Cargo
@@ -28,7 +31,7 @@ discscape render picture.png - --profile disc_profile.json
 ```
 
 ### Disc Profiles
-A disc profile is a JSON document describing the recoding medium, spiral geometry, optional phase correction, and optional media/recording metadata.
+A disc profile is a JSON document describing the recording medium, spiral geometry, optional phase correction, and optional media/recording metadata.
 
 To inspect a profile and view its derived geometry information:
 ```
@@ -51,4 +54,5 @@ discscape render picture.png - --profile disc_profile.json | growisofs -dvd-comp
 ## Documentation
 - [Calibration Notes](./notes.md) - Experimental calibration procedure and measurement notes.
 - [Geometry Fitting Notes](./fitter_notes.md) - Mathematical background for geometry fitting.
-- [Disc Profile](./disc_profile.md) - Disc profile format description
+- [Disc Profile](./doc/profile.md) - Disc profile format description
+- [Measurements](./doc/measurements.md) - Measurements format description
