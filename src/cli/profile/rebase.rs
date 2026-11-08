@@ -72,7 +72,7 @@ pub fn profile_rebase_command(args: ProfileRebaseArgs) -> anyhow::Result<()> {
         let sum_sq: f64 = interpo.samples.iter()
             .map(|s| s.rev * s.rev)
             .sum();
-        let rms = sum_sq / interpo.samples.len() as f64;
+        let rms = (sum_sq / interpo.samples.len() as f64).sqrt();
 
         eprintln!("Correction");
         eprintln!("  Max Correction:        {:+.6} rev", max_abs);
