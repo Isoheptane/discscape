@@ -11,7 +11,7 @@
     "correction": {
         "type": "interpolation",
         "method": "linear",
-        "extrapolation": "clamp",
+        "extrapolation": "linear",
         "samples": [
             [25.0,  0.000000],
             [30.0,  0.002319],
