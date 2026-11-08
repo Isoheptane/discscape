@@ -36,15 +36,15 @@ pub fn profile_scale_command(args: ProfileScaleArgs) -> anyhow::Result<()> {
         }
     }
 
-    let inner: Box<dyn Write> = if &args.output == "-" {
-        Box::new(std::io::stdout().lock())
+    let output_content = serde_json::to_string_pretty(&profile)?;
+    if args.output == "-" {
+        println!("{output_content}")
     } else {
-        let file = File::create_new(&args.output)
+        let mut file = File::create_new(&args.output)
             .with_context(|| format!("Failed to create or open output file '{}'", args.output))?;
-        Box::new(file)
-    };
-    serde_json::to_writer_pretty(inner, &profile)
-        .with_context(|| format!("Failed to profile to file '{}'", args.output))?;
+        file.write_all(output_content.as_bytes())
+            .with_context(|| format!("Failed to write to output profile '{}'", args.output))?;
+    }
 
     Ok(())
 }
