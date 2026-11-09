@@ -52,7 +52,6 @@ discscape render picture.png - --profile disc_profile.json | growisofs -dvd-comp
 ```
 
 ## Documentation
-- [Calibration Notes](./notes.md) - Experimental calibration procedure and measurement notes.
-- [Geometry Fitting Notes](./fitter_notes.md) - Mathematical background for geometry fitting.
+- [Calibration Process](./notes.md) - Calibration Process and Guide
 - [Disc Profile](./doc/profile.md) - Disc profile format description
 - [Measurements](./doc/measurements.md) - Measurements format description
