@@ -78,9 +78,9 @@ pub fn profile_fit_command(args: ProfileFitArgs) -> anyhow::Result<()> {
     let delta_rend = new_geometry.outer_radius_mm() - geometry.outer_radius_mm();
 
     eprintln!("Geometry");
-    eprintln!("  Track Pitch:        {:.9} µm  ({:+.9} µm)"  , geometry.pitch_um(), delta_p);
-    eprintln!("  Revolutions:        {:.6} rev ({:+.6} rev)" , geometry.revolutions(), delta_n);
-    eprintln!("  End Radius:         {:.3} mm  ({:+.3} mm)"  , geometry.outer_radius_mm(), delta_rend);
+    eprintln!("  Track Pitch:        {:.9} µm  ({:+.9} µm)"  , new_geometry.pitch_um(), delta_p);
+    eprintln!("  Revolutions:        {:.6} rev ({:+.6} rev)" , new_geometry.revolutions(), delta_n);
+    eprintln!("  End Radius:         {:.3} mm  ({:+.3} mm)"  , new_geometry.outer_radius_mm(), delta_rend);
     eprintln!();
 
     profile.geometry = GeometryProfile::from(new_geometry);

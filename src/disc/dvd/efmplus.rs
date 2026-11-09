@@ -116,7 +116,7 @@ impl EFMPlusStateMachine {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum TransitionDensity {
+pub enum BinaryTransitionDensity {
     LowDensity = 0,
     HighDensity = 1,
 }
@@ -128,12 +128,16 @@ impl EFMPlusStrategy {
     const TRANSITION_STRATEGY: [[u8; 2]; 4] = [
         [0x5F, 0x62], // State 1
         // 0000001000000010 ; 0010010010010010
+        // 8-8 ; 3-3-3-3-4 ;
         [0x40, 0x62], // State 2
         // 0000010000000010 ; 0010010010010010
+        // 8-8 ; 3-3-3-3-4 ;
         [0xB2, 0x70], // State 3
         // 1000000100000010 ; 1001001001001001
+        // 7-7-2 ; 3-3-3-3-3 ;
         [0xB2, 0x70], // State 4
         // 1000000100000010 ; 1001001001001001
+        // 7-7-2 ; 3-3-3-3-3 ;
     ];
 
     /*
@@ -161,7 +165,7 @@ impl EFMPlusStrategy {
     */
 
     #[inline]
-    pub const fn choose(state: EFMPlusState, density: TransitionDensity) -> u8 {
+    pub const fn choose(state: EFMPlusState, density: BinaryTransitionDensity) -> u8 {
         Self::TRANSITION_STRATEGY[state as usize][density as usize]
     }
 }

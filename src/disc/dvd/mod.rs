@@ -1,7 +1,7 @@
 mod efmplus;
 mod scramble;
 
-use efmplus::{EFMPlusStateMachine, EFMPlusStrategy, TransitionDensity};
+use efmplus::{EFMPlusStateMachine, EFMPlusStrategy, BinaryTransitionDensity};
 use scramble::SCRAMBLE_LUT;
 
 use crate::picture::DiscPicture;
@@ -239,9 +239,9 @@ pub fn generate_sector(
 
         let luma = image_samples[channel_word as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE];
         let next_byte =  if dither.dither(luma, sector_num as u64 * MAIN_DATA_SIZE as u64 + i as u64) {
-            EFMPlusStrategy::choose(state.state(), TransitionDensity::HighDensity)
+            EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::HighDensity)
         } else {
-            EFMPlusStrategy::choose(state.state(), TransitionDensity::LowDensity)
+            EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::LowDensity)
         };
         state.next(next_byte);
 
