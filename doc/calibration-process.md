@@ -1,26 +1,29 @@
 # Calibration Process
-符號約定：從資料面觀看，順時針方向為正。
+**English** | [繁體中文](./calibration-process.zh-Hant.md)
 
-### 核心概念
-光碟螺旋軌跡由三個基本幾何引數構成：起始半徑 ($r_0$)、軌距 ($p$) 與總圈數 ($N$)。校準的目標是讓燒錄出的直線輻條對齊徑向：
-- **$N$（總圈數）誤差**：會導致輻條從內到外產生單向的螺旋纏繞。
-- **$p$（軌距）誤差**：會導致輻條呈現「弓形」（C 形）彎曲。
-- **區域性殘差**：通常會呈現「S 形」彎曲，需透過在 Profile 中寫入修正表來補償。
+Sign convention: Viewed from the data side, the clockwise direction is positive.
 
-### 校準影像
-- `spoke-no-ring`：無圓環。僅在扭曲極度嚴重、圓環會干擾視線時使用。
-- `spoke-thin-ring`：含 25–55 mm（每 5 mm 步進）的 0.2 mm 細環。
-- `spoke-full`：含 25–55 mm（每 5 mm 步進）的 0.5 mm 粗環，以及每 1 mm 步進的 0.05 mm 細環。用於高密度殘差測量與半徑校準，也可用於初始擬合。
+### Core Concepts
+An optical disc's spiral track is defined by three basic geometric parameters: starting radius ($r_0$), track pitch ($p$), and total number of turns ($N$). The goal of calibration is to align the burned straight spokes along the radial direction:  
+- **$N$ error** (total turns): Causes the spokes to wind spirally in a single direction from the inner to the outer region.
+- **$p$ error** (track pitch): Causes the spokes to exhibit a "bow-shaped" (C-shaped) curvature.
+- **Local residuals**: Typically appear as an "S-shaped" curvature, compensated by writing a correction table into the profile.
 
-## 校準實例流程
-以下我們以一張 **Verbatim DVD+RW 4x (MID: MKM/A02)** 光碟為例，示範如何從零開始完成整個校準過程。
+### Calibration Images
+- `spoke-no-ring`: No rings. Used only when distortion is extremely severe and the rings would obstruct visibility.
+- `spoke-thin-ring`: Contains 0.2 mm thin rings from 25–55 mm in 5 mm steps.
+- `spoke-full`: Contains 0.5 mm thick rings (25–55 mm, 5 mm steps) and 0.05 mm thin rings (1 mm steps). Used for high-density residual measurement, radius calibration, and initial fitting.
 
-## 1. 初始幾何引數
-先固定標稱 $r_0$，使用現有 Profile 中的基本幾何引數或以下預設值燒錄第一張光碟：
-- **CD (80 min)**：$r_0=25.00\ \text{mm},\ p = 1.51\ \mu\text{m},\ N=22110.0$
-- **DVD (4.7 GB)**：$r_0=24.00\ \text{mm},\ p = 0.74\ \mu\text{m},\ N=46000.0$
+## Calibration Walkthrough Example
+Below, we use a **Verbatim DVD+RW 4x** (MID: MKM/A02) disc as an example to demonstrate how to complete the entire calibration process from scratch.
 
-這裡我們採用 DVD 的預設幾何引數，建立初始設定檔 `step0_init.json` （此時尚未進行任何補償，因此 `correction` 設為 `null`）：
+## 1. Initial Geometric Parameters
+First, fix the nominal $r_0$ and burn the first disc using the basic geometric parameters from an existing profile or the following default values:
+- **CD (80 min)**: $r_0$ = 25.00 mm, $p$ = 1.51 μm, $N$ = 22110.0
+- **DVD (4.7 GB)**: $r_0$ = 24.00 mm, $p$ = 0.74 μm, $N$ = 46000.0
+
+Here, we adopt the default DVD geometric parameters to create the initial configuration file `step0_init.json` (since no compensation has been applied yet, `correction` is set to `null`):
+
 ```json
 {
     "disc": {
@@ -36,21 +39,25 @@
 }
 ```
 
-## 2. 粗調階段
-**使用影像**：`spoke-full` 或 `spoke-no-ring`
+## 2. Coarse Tuning Stage
+**Images used**: spoke-full or spoke-no-ring
 
-### 做法 A（推薦：同時擬合 $N$ 與 $p$）
-使用帶有圓環的影像（如 `spoke-full`）配合 `step0_init.json` 燒錄第一張光碟。即使初始引數讓輻條過度扭曲，半徑圓環通常依然清晰可見。我們可以估讀每個半徑位置上輻條累積轉了多少圈，輸入到 Fitting 工具中同時計算出修正後的 $N$ 和 $p$，這能大幅縮短後續校準過度扭曲 $p$ 的時間。
+### Method A (Recommended: Fit $N$ and $p$ Simultaneously)
+Burn the first disc using an image with rings (such as spoke-full) together with `step0_init.json`. Even if the initial parameters cause severe spoke distortion, the radius rings usually remain clearly visible. We can estimate the cumulative number of turns of the spokes at each radial position and feed these readings into the fitting tool to compute the corrected $N$ and $p$ simultaneously, which substantially reduces the time needed to calibrate a heavily distorted $p$ later on.
 
 ![](./assets/calibration-process-step0.webp)
 
-初始引數 `step0_init.json` 的燒錄結果如圖所示。
+The burn result from the initial parameters in `step0_init.json ` is shown in the figure.
 
-從內圈往外圈看，勉強能看出螺旋有逆時針趨勢。（從螺旋往逆時針看，會注意到螺旋距離外側圓環的距離逐漸靠近）
+Viewing from the inner ring toward the outer ring, a counterclockwise winding trend in the spiral is barely discernible (following the spiral in the counterclockwise direction, notice that the distance between the spiral line and the outer radius ring gradually decreases; therefore, subsequent revolution readings are recorded as negative values).
 
-圖中標記所示從 25 mm 半徑處開始向外讀數，紅色實線為半徑圓環，橙色實線為從內到外讀到的一圈螺旋，橙色虛線為根據兩側實線密度估讀的螺旋位置。
 
-我們將照片中各個半徑圓環上估讀的累積圈數整理到 `coarse_meas.json` 檔案中：
+As marked in the figure, we take readings outward starting from the 25 mm radius:
+- **Solid red lines**: Mark the reference positions of each radius ring in mm.
+- **Solid orange lines**: Integer-turn spiral positions clearly visible from inside to outside.
+- **Dashed orange lines**: Integer-turn positions obscured by overlapping 0.5 mm thick rings, interpolated from the spacing density of adjacent solid lines.
+
+We compile the estimated cumulative revolutions at each radius ring from the photo into the `coarse_meas.json` file:
 
 ```json
 {
@@ -69,13 +76,13 @@
 }
 ```
 
-接著執行以下指令，計算新的 $N$ 和 $p$ 並套用到新的 Profile (`step1_coarse.json`) 中：
+Next, run the following command to calculate the new $N$ and $p$ and apply them to a new profile (`step1_coarse.json`):
 
 ```bash
 discscape profile fit step0_init.json step1_coarse.json -m coarse_meas.json
 ```
 
-執行後，`step1_coarse.json` 中的 `geometry` 會更新為初步收斂後的數值。
+After execution, `geometry` in `step1_coarse.json` updates to the initially converged values:
 
 ```json
 "geometry": {
@@ -85,24 +92,24 @@ discscape profile fit step0_init.json step1_coarse.json -m coarse_meas.json
 }
 ```
 
-隨後使用 `step1_coarse.json` 重新燒錄一張光碟，檢視修正效果。
+Then burn a new disc using `step1_coarse.json` to inspect the correction results.
 
-### 做法 B（單獨調整 $N$）
-若扭曲極度密集導致圓環干擾判讀，可改燒錄 `spoke-no-ring` 影像，直接觀察輻條從內到外旋轉的總圈數 $m$。順時針旋轉則將 $N$ 加 $m$，逆時針則減 $m$。
+### Method B (Adjust $N$ Individually)
+If the distortion is so dense that the rings interfere with reading, burn the `spoke-no-ring` image instead and directly observe the total number of turns $m$ that the spokes rotate from inside to outside. Add $m$ to $N$ for clockwise rotation, or subtract $m$ for counterclockwise rotation.   
 
-### 進入下一階段的條件
-當整體扭轉圈數已經足夠小（例如小於 1~2 圈），或者扭曲中開始出現明顯的「弓形」畸變時，說明 $N$ 已不再是誤差中的主導部分，即可進入細調階段。
+### Criteria for Entering the Next Stage
+Once the overall number of twisted turns is sufficiently small (for example, less than 1–2 turns), or a distinct "bow-shaped" distortion begins to appear within the twist, $N$ is no longer the dominant component of the error, and you can proceed to the fine tuning stage.
 
-## 3. 細調階段
-**使用影像**：`spoke-thin-ring` 或 `spoke-full`
+## 3. Fine Tuning Stage
+**Images used**: `spoke-thin-ring` 或 `spoke-full`
 
-使用粗調後的 Profile 燒錄影像。此時輻條已不再劇烈纏繞，但通常會帶有明顯的「弓形」彎曲。請從最內圈根部開始，數出每個半徑圓環（僅需讀取 5 mm 步進）上輻條累積轉了多少圈（含小數）或偏移角度並記錄下來，若內圈根部模糊無法辨識，請選擇一個能看清的半徑 $r_z$（設定為 `ref_radius`）作為基準，記錄其他半徑相對該基準轉了多少圈或多少度。
+Burn the image using the coarse-tuned profile. At this stage, the spokes no longer wind severely, though they typically carry a noticeable "bow-shaped" curvature. Starting from the innermost root, count and record how many cumulative turns (including decimals) or degrees of angular offset the spokes have rotated at each radius ring (reading only at 5 mm steps is needed); if the inner root is blurry and unreadable, choose a clearly visible radius $r_z$ (set as `ref_radius`) as the reference and record how many turns or degrees the other radii rotate relative to that reference.
 
 ![](./assets/calibration-process-step1.webp)
 
-上一輪 `step1_coarse.json` 的燒錄結果如圖所示。
+The burn result from the initial parameters in `step1_coarse.json` is shown in the figure.
 
-從上圖可以看到，輻條呈現典型的伴隨整體逆時針趨勢的弓形彎曲。這裡我們從根部開始測量誤差。將照片中量測到的 5 mm 步進偏移資料整理到 `fine_meas.json` 檔案中。
+As seen in the figure above, the spokes exhibit a classic bow-shaped curvature accompanied by an overall counterclockwise trend. Here, we measure the error starting from the **root** and compile the 5 mm increment offset data measured from the photo into the `fine_meas.json` file:
 
 ```json
 {
@@ -121,13 +128,14 @@ discscape profile fit step0_init.json step1_coarse.json -m coarse_meas.json
 }
 ```
 
-接著執行以下指令，計算新的 $N$ 和 $p$ 並套用到新的 Profile (`step1_coarse.json`) 中：
+Next, run the following command to calculate the new $N$ and $p$ and apply them to a new profile (`step2_fine.json`):
 
 ```bash
 discscape profile fit step1_coarse.json step2_fine.json -m fine_meas.json
 ```
 
-更新後的 `step2_fine.json` 幾何引數如下：
+The updated geometric parameters in `step2_fine.json` are as follows:
+
 ```json
 "geometry": {
     "r0_mm": 24.0,
@@ -136,11 +144,11 @@ discscape profile fit step1_coarse.json step2_fine.json -m fine_meas.json
 }
 ```
 
-使用新的 Profile 重新燒錄。
+Burn again using the new profile.
 
-重複上述步驟直到輻條大致對齊徑向方向。當弓形彎曲已經消除、結果已經足夠好（僅剩下微小的 S 形區域性誤差）時，即可進入最後一步。
+Repeat the steps above until the spokes are roughly aligned with the radial direction. Once the bow-shaped curvature is eliminated and the result is good enough (leaving only minor S-shaped local errors), you can proceed to the final step.
 
-## 4. 殘差修正
-**使用影像**：`spoke-full`
+## 4. Residual Correction
+**Image used**: `spoke-full`
 
-即便 $N$ 與 $p$ 已經完全收斂，由於光碟軌距的局部微小變化或燒錄機特性，輻條通常仍會帶有微小的「S 形」彎曲。此時請燒錄 spoke-full 影像，並透過照片讀取每個 1 mm 步進半徑上，相對於根部（或基準半徑）旋轉的圈數、角度、或偏移的切線弧長 (`arc_mm`)。
+Even when $N$ and $p$ have fully converged, the spokes usually retain a slight "S-shaped" curvature due to minor local variations in the disc's track pitch or drive characteristics. At this point, burn the `spoke-full` image and read from the photo—at each 1 mm radius increment—the number of turns, angle, or tangential arc length offset (`arc_mm`) rotated relative to the root (or reference radius).
