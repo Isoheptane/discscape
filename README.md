@@ -52,6 +52,6 @@ discscape render picture.png - --profile disc_profile.json | growisofs -dvd-comp
 ```
 
 ## Documentation
-- [Calibration Process](./notes.md) - Calibration Process and Guide
+- [Calibration Process](./doc/calibration-process.md) - Calibration Process and Guide
 - [Disc Profile](./doc/profile.md) - Disc profile format description
 - [Measurements](./doc/measurements.md) - Measurements format description

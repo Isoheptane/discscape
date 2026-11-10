@@ -83,6 +83,18 @@ pub fn profile_fit_command(args: ProfileFitArgs) -> anyhow::Result<()> {
     eprintln!("  End Radius:         {:.3} mm  ({:+.3} mm)"  , new_geometry.outer_radius_mm(), delta_rend);
     eprintln!();
 
+    let max_abs: f64 = residual.iter()
+        .map(|s| s.rev.abs())
+        .fold(f64::NEG_INFINITY, f64::max);
+    let sum_sq: f64 = residual.iter()
+        .map(|s| s.rev * s.rev)
+        .sum();
+    let rms = (sum_sq / residual.len() as f64).sqrt();
+
+    eprintln!("Residual");
+    eprintln!("  Max Residual:      {:+.6} rev", max_abs);
+    eprintln!("  Residual RMS:      {:.6} rev", rms);
+
     profile.geometry = GeometryProfile::from(new_geometry);
     if args.bake {
         if let Some(correction) = &profile.correction && args.accumulate_correction {
