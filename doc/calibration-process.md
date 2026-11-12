@@ -105,7 +105,7 @@ Once the overall number of twisted turns is sufficiently small (for example, les
 
 Burn the image using the coarse-tuned profile. At this stage, the spokes no longer wind severely, though they typically carry a noticeable "bow-shaped" curvature. Starting from the innermost root, count and record how many cumulative turns (including decimals) or degrees of angular offset the spokes have rotated at each radius ring (reading only at 5 mm steps is needed); if the inner root is blurry and unreadable, choose a clearly visible radius $r_z$ (set as `ref_radius`) as the reference and record how many turns or degrees the other radii rotate relative to that reference.
 
-![](./assets/calibration-process-step1.webp)
+![](./assets/calibration-process/step1.webp)
 
 The burn result from the initial parameters in `step1_coarse.json` is shown in the figure.
 

@@ -44,7 +44,7 @@
 ### 做法 A（推薦：同時擬合 $N$ 與 $p$）
 使用帶有圓環的影像（如 `spoke-full`）配合 `step0_init.json` 燒錄第一張光碟。即使初始參數讓輻條過度扭曲，半徑圓環通常依然清晰可見。我們可以估讀每個半徑位置上輻條累積轉了多少圈，輸入到 Fitting 工具中同時計算出修正後的 $N$ 和 $p$，這能大幅縮短後續校準過度扭曲 $p$ 的時間。
 
-![](./assets/calibration-process-step0.webp)
+![](./assets/calibration-process/step0.webp)
 
 初始參數 `step0_init.json` 的燒錄結果如圖所示。
 
@@ -103,7 +103,7 @@ discscape profile fit step0_init.json step1_coarse.json -m coarse_meas.json
 
 使用粗調後的 Profile 燒錄影像。此時輻條已不再劇烈纏繞，但通常會帶有明顯的「弓形」彎曲。請從最內圈根部開始，數出每個半徑圓環（僅需讀取 5 mm 步進）上輻條累積轉了多少圈（含小數）或偏移角度並記錄下來；若內圈根部模糊無法辨識，請選擇一個能看清的半徑 $r_z$（設定為 `ref_radius`）作為基準，記錄其他半徑相對該基準轉了多少圈或多少度。
 
-![](./assets/calibration-process-step1.webp)
+![](./assets/calibration-process/step1.webp)
 
 上一輪 `step1_coarse.json` 的燒錄結果如圖所示。
 
