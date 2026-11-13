@@ -1,0 +1,31 @@
+{
+  "disc": {
+    "type": "DVD+R",
+    "capacity_sectors": 2295104
+  },
+  "geometry": {
+    "r0_mm": 24.0,
+    "pitch_um": 0.7387212037172239,
+    "n": 45903.918624181315
+  },
+  "correction": null,
+    "metadata": {
+      "media": {
+          "brand": "JVB",
+          "description": "JVC DVD+R 16",
+          "mid": "RITEK/F16",
+          "rated_speed": "1-12x"
+      },
+      "recording": {
+          "drive": "LG DVDRAM GH22NS50",
+          "firmware": "TN02",
+          "speed_x": 10,
+          "software": "growisofs",
+          "date": "2026-11-08"
+      },
+      "notes": [
+          "Calibrated",
+          "Further refinement may be needed due to small bumps"
+      ]
+  }
+}
