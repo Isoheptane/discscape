@@ -4,10 +4,12 @@ mod scramble;
 use efmplus::{EFMPlusStateMachine, EFMPlusStrategy, BinaryTransitionDensity};
 use scramble::SCRAMBLE_LUT;
 
+use crate::disc::pattern::Pattern;
 use crate::picture::DiscPicture;
 use crate::geometry::{CorrectedSpiralGeometry, PolarCoord};
-use crate::dither::Dither;
+use crate::dither::{Dither};
 use crate::profile::{DiscType, ProfileError};
+use crate::random::Random;
 
 
 pub const MAIN_DATA_SIZE: usize         = 2048;
@@ -165,6 +167,9 @@ pub fn generate_sector(
     disc: &DvdDisc,
     picture: &DiscPicture,
     dither: &Dither,
+    random: &Random,
+    light: Pattern,
+    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MAIN_DATA_SIZE] {
 
@@ -237,14 +242,27 @@ pub fn generate_sector(
             state.reset();
         }
 
+        let abs_address = sector_num as u64 * MAIN_DATA_SIZE as u64 + i as u64;
         let luma = image_samples[channel_word as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE];
-        let next_byte =  if dither.dither(luma, sector_num as u64 * MAIN_DATA_SIZE as u64 + i as u64) {
-            EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::HighDensity)
+        let pattern = if dither.dither(luma, abs_address) {
+            light
         } else {
-            EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::LowDensity)
+            dark
         };
-        state.next(next_byte);
 
+        let next_byte = match pattern {
+            Pattern::ShortPeriod => {
+                EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::ShortPeriod)
+            },
+            Pattern::LongPeriod => {
+                EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::LongPeriod)
+            },
+            Pattern::Random => {
+                random.sample(abs_address, scramble_table[i])
+            },
+        };
+        
+        state.next(next_byte);
         chunk[i] = next_byte ^ scramble_table[i]
     }
 

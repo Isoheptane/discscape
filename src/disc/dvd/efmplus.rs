@@ -117,8 +117,8 @@ impl EFMPlusStateMachine {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum BinaryTransitionDensity {
-    LowDensity = 0,
-    HighDensity = 1,
+    LongPeriod = 0,
+    ShortPeriod = 1,
 }
 
 #[derive(Debug, Clone, Copy, Default)]

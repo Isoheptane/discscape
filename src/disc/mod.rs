@@ -1,5 +1,6 @@
 pub mod cd;
 pub mod dvd;
+pub mod pattern;
 
 pub use cd::{*};
 pub use dvd::{*};

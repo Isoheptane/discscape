@@ -1,6 +1,8 @@
+use crate::disc::pattern::Pattern;
 use crate::dither::Dither;
 use crate::picture::DiscPicture;
 use crate::geometry::{CorrectedSpiralGeometry, PolarCoord, SpiralGeometry};
+use crate::random::Random;
 
 pub const SECTOR_SIZE_BYTES:        usize = 2352;
 pub const SYNC_SIZE_BYTES:      usize = 12;
@@ -16,9 +18,9 @@ pub const MODE1_2352_CHUNK_SIZE:    usize = 2352;
 pub const MODE2_2336_CHUNK_SIZE:    usize = 2336;
 
 /// 10010001001001
-const EFM_BYTE_DENSITY_HIGH:    u8 = 0xAA;
+const EFM_BYTE_SHORT_PERIOD:    u8 = 0xAA;
 /// 00000000100000
-const EFM_BYTE_DENSITY_LOW:     u8 = 0x20;
+const EFM_BYTE_LONG_PERIOD:     u8 = 0x20;
 
 pub type FramePosition = (i64, u8);
 
@@ -225,18 +227,36 @@ pub fn generate_audio_chunk(
     disc: &CdDisc,
     picture: &DiscPicture,
     dither: &Dither,
+    random: &Random,
+    light: Pattern,
+    dark: Pattern,
     sector_num: usize,
 ) -> [u8; AUDIO_CHUNK_SIZE] {
     let mut chunk = [0; AUDIO_CHUNK_SIZE];
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..AUDIO_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64, false);
-        if dither.dither(luma, sector_num as u64 * AUDIO_CHUNK_SIZE as u64 + i as u64) {
-            chunk[i] = EFM_BYTE_DENSITY_HIGH;
+        let abs_address = sector_base as u64 + i as u64;
+        let luma = sample_image_luma(disc, picture, abs_address, false);
+        let pattern = if dither.dither(luma, abs_address) {
+            light
         } else {
-            chunk[i] = EFM_BYTE_DENSITY_LOW;
+            dark
         };
+
+        let next_byte = match pattern {
+            Pattern::ShortPeriod => {
+                EFM_BYTE_SHORT_PERIOD
+            },
+            Pattern::LongPeriod => {
+                EFM_BYTE_LONG_PERIOD
+            },
+            Pattern::Random => {
+                random.sample(abs_address, 0x00)
+            },
+        };
+        
+        chunk[i] = next_byte;
     }
 
     chunk
@@ -247,6 +267,9 @@ pub fn generate_mode1_2352_chunk(
     disc: &CdDisc,
     picture: &DiscPicture,
     dither: &Dither,
+    random: &Random,
+    light: Pattern,
+    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MODE1_2352_CHUNK_SIZE] {
     let mut chunk = [0; MODE1_2352_CHUNK_SIZE];
@@ -263,12 +286,27 @@ pub fn generate_mode1_2352_chunk(
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 16..MODE1_2352_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64, true);
-        if dither.dither(luma, sector_num as u64 * MODE1_2352_CHUNK_SIZE as u64 + i as u64) {
-            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i - 12];
+        let abs_address = sector_base as u64 + i as u64;
+        let luma = sample_image_luma(disc, picture, abs_address, false);
+        let pattern = if dither.dither(luma, abs_address) {
+            light
         } else {
-            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i - 12];
+            dark
         };
+
+        let next_byte = match pattern {
+            Pattern::ShortPeriod => {
+                EFM_BYTE_SHORT_PERIOD
+            },
+            Pattern::LongPeriod => {
+                EFM_BYTE_LONG_PERIOD
+            },
+            Pattern::Random => {
+                random.sample(abs_address, SCRAMBLE_TABLE[i - 12])
+            },
+        };
+        
+        chunk[i] = next_byte ^ SCRAMBLE_TABLE[i - 12];
     }
 
     chunk
@@ -279,18 +317,36 @@ pub fn generate_mode1_2048_chunk(
     disc: &CdDisc,
     picture: &DiscPicture,
     dither: &Dither,
+    random: &Random,
+    light: Pattern,
+    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MODE1_2048_CHUNK_SIZE] {
     let mut chunk = [0; MODE1_2048_CHUNK_SIZE];
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE1_2048_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64 + 16, true);
-        if dither.dither(luma, sector_num as u64 * MODE1_2048_CHUNK_SIZE as u64 + i as u64) {
-            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
+        let abs_address = sector_base as u64 + i as u64 + 16;
+        let luma = sample_image_luma(disc, picture, abs_address, false);
+        let pattern = if dither.dither(luma, abs_address) {
+            light
         } else {
-            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
+            dark
         };
+
+        let next_byte = match pattern {
+            Pattern::ShortPeriod => {
+                EFM_BYTE_SHORT_PERIOD
+            },
+            Pattern::LongPeriod => {
+                EFM_BYTE_LONG_PERIOD
+            },
+            Pattern::Random => {
+                random.sample(abs_address, SCRAMBLE_TABLE[i + 4])
+            },
+        };
+        
+        chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
     }
 
     chunk
@@ -301,18 +357,36 @@ pub fn generate_mode2_2336_chunk(
     disc: &CdDisc,
     picture: &DiscPicture,
     dither: &Dither,
+    random: &Random,
+    light: Pattern,
+    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MODE2_2336_CHUNK_SIZE] {
     let mut chunk = [0; MODE2_2336_CHUNK_SIZE];
 
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE2_2336_CHUNK_SIZE {
-        let luma = sample_image_luma(disc, picture, (sector_base + i) as u64 + 16, true);
-        if dither.dither(luma, sector_num as u64 * MODE2_2336_CHUNK_SIZE as u64 + i as u64) {
-            chunk[i] = EFM_BYTE_DENSITY_HIGH ^ SCRAMBLE_TABLE[i + 4];
+        let abs_address = sector_base as u64 + i as u64 + 16;
+        let luma = sample_image_luma(disc, picture, abs_address, false);
+        let pattern = if dither.dither(luma, abs_address) {
+            light
         } else {
-            chunk[i] = EFM_BYTE_DENSITY_LOW ^ SCRAMBLE_TABLE[i + 4];
+            dark
         };
+
+        let next_byte = match pattern {
+            Pattern::ShortPeriod => {
+                EFM_BYTE_SHORT_PERIOD
+            },
+            Pattern::LongPeriod => {
+                EFM_BYTE_LONG_PERIOD
+            },
+            Pattern::Random => {
+                random.sample(abs_address, SCRAMBLE_TABLE[i + 4])
+            },
+        };
+        
+        chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
     }
     chunk
 }
