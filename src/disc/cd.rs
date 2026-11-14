@@ -177,10 +177,6 @@ impl CdDisc {
         }
         let frame = frame as u64;
 
-        if frame >= self.total_frames {
-            return None;
-        }
-        
         let bit =
             frame * CHANNEL_BITS_PER_FRAME
             + 27
