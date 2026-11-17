@@ -5,7 +5,7 @@ use crate::geometry::{CorrectedSpiralGeometry, PolarCoord, SpiralGeometry};
 use crate::random::Random;
 
 pub const SECTOR_SIZE_BYTES:        usize = 2352;
-pub const SYNC_SIZE_BYTES:      usize = 12;
+pub const SYNC_SIZE_BYTES:          usize = 12;
 pub const SCRAMBLE_LUT_LEN:         usize = SECTOR_SIZE_BYTES - SYNC_SIZE_BYTES;
 
 pub const F1_FRAME_SIZE_BYTES:      usize = 24;
@@ -18,9 +18,13 @@ pub const MODE1_2352_CHUNK_SIZE:    usize = 2352;
 pub const MODE2_2336_CHUNK_SIZE:    usize = 2336;
 
 /// 10010001001001
-const EFM_BYTE_SHORT_PERIOD:    u8 = 0xAA;
-/// 00000000100000
-const EFM_BYTE_LONG_PERIOD:     u8 = 0x20;
+const EFM_BYTE_PERIOD_SHORTEST:     u8 = 0xAA;
+/// 10001000100010
+const EFM_BYTE_PERIOD_SHORT:        u8 = 0x63;
+/// 01000010000010
+const EFM_BYTE_PERIOD_MEDIUM:       u8 = 0x74;
+/// 00000000100000 
+const EFM_BYTE_PERIOD_LONG:         u8 = 0x20;
 
 pub type FramePosition = (i64, u8);
 
@@ -218,6 +222,19 @@ fn sample_image_luma(
     return image.sample_polar(coord);
 }
 
+#[inline]
+fn select_byte(pattern: Pattern, random: &Random, abs_address: u64, scramble: u8) -> u8 {
+    match pattern {
+        Pattern::Random => {
+            random.sample(abs_address, scramble)
+        },
+        Pattern::PeriodShortest => EFM_BYTE_PERIOD_SHORTEST,
+        Pattern::PeriodShort => EFM_BYTE_PERIOD_SHORT,
+        Pattern::PeriodMedium => EFM_BYTE_PERIOD_MEDIUM,
+        Pattern::PeriodLong => EFM_BYTE_PERIOD_LONG,
+    }
+}
+
 /// Generates a full audio sector
 pub fn generate_audio_chunk(
     disc: &CdDisc,
@@ -240,17 +257,7 @@ pub fn generate_audio_chunk(
             dark
         };
 
-        let next_byte = match pattern {
-            Pattern::ShortPeriod => {
-                EFM_BYTE_SHORT_PERIOD
-            },
-            Pattern::LongPeriod => {
-                EFM_BYTE_LONG_PERIOD
-            },
-            Pattern::Random => {
-                random.sample(abs_address, 0x00)
-            },
-        };
+        let next_byte = select_byte(pattern, random, abs_address, 0x00);
         
         chunk[i] = next_byte;
     }
@@ -290,17 +297,7 @@ pub fn generate_mode1_2352_chunk(
             dark
         };
 
-        let next_byte = match pattern {
-            Pattern::ShortPeriod => {
-                EFM_BYTE_SHORT_PERIOD
-            },
-            Pattern::LongPeriod => {
-                EFM_BYTE_LONG_PERIOD
-            },
-            Pattern::Random => {
-                random.sample(abs_address, SCRAMBLE_TABLE[i - 12])
-            },
-        };
+        let next_byte = select_byte(pattern, random, abs_address, SCRAMBLE_TABLE[i - 12]);
         
         chunk[i] = next_byte ^ SCRAMBLE_TABLE[i - 12];
     }
@@ -330,17 +327,7 @@ pub fn generate_mode1_2048_chunk(
             dark
         };
 
-        let next_byte = match pattern {
-            Pattern::ShortPeriod => {
-                EFM_BYTE_SHORT_PERIOD
-            },
-            Pattern::LongPeriod => {
-                EFM_BYTE_LONG_PERIOD
-            },
-            Pattern::Random => {
-                random.sample(abs_address, SCRAMBLE_TABLE[i + 4])
-            },
-        };
+        let next_byte = select_byte(pattern, random, abs_address, SCRAMBLE_TABLE[i + 4]);
         
         chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
     }
@@ -370,17 +357,7 @@ pub fn generate_mode2_2336_chunk(
             dark
         };
 
-        let next_byte = match pattern {
-            Pattern::ShortPeriod => {
-                EFM_BYTE_SHORT_PERIOD
-            },
-            Pattern::LongPeriod => {
-                EFM_BYTE_LONG_PERIOD
-            },
-            Pattern::Random => {
-                random.sample(abs_address, SCRAMBLE_TABLE[i + 4])
-            },
-        };
+        let next_byte = select_byte(pattern, random, abs_address, SCRAMBLE_TABLE[i + 4]);
         
         chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
     }

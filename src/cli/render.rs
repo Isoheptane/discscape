@@ -28,12 +28,18 @@ pub enum CdFormat {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum PatternArg {
+    /// Shortest-period modulation pattern
+    #[value(name = "shortest", alias = "3t", alias = "xs")]
+    PeriodShortest,
     /// Short-period modulation pattern
-    #[value(name = "short")]
-    ShortPeriod,
+    #[value(name = "short", alias = "4t", alias = "s")]
+    PeriodShort,
+    /// Medium-period modulation pattern
+    #[value(name = "medium", alias = "5t", alias = "6t", alias = "s")]
+    PeriodMedium,
     /// Long-period modulation pattern
-    #[value(name = "long")]
-    LongPeriod,
+    #[value(name = "long", alias = "8t", alias = "l")]
+    PeriodLong,
     /// Broadband / aperiodic scatter pattern, configured via --random
     #[value(name = "random", alias = "broadband", alias = "diffuse")]
     Random,
@@ -42,9 +48,11 @@ pub enum PatternArg {
 impl From<PatternArg> for Pattern {
     fn from(arg: PatternArg) -> Self {
         match arg {
-            PatternArg::ShortPeriod => Pattern::ShortPeriod,
-            PatternArg::LongPeriod => Pattern::LongPeriod,
-            PatternArg::Random => Pattern::Random,
+            PatternArg::PeriodShortest  => Pattern::PeriodShortest,
+            PatternArg::PeriodShort     => Pattern::PeriodShort,
+            PatternArg::PeriodMedium    => Pattern::PeriodMedium,
+            PatternArg::PeriodLong      => Pattern::PeriodLong,
+            PatternArg::Random          => Pattern::Random,
         }
     }
 }
@@ -284,7 +292,7 @@ pub struct RenderArgs {
     #[arg(
         long,
         value_enum,
-        default_value_t = PatternArg::ShortPeriod,
+        default_value_t = PatternArg::PeriodShortest,
         help_heading = "Rendering Options"
     )]
     pub light: PatternArg,
@@ -293,7 +301,7 @@ pub struct RenderArgs {
     #[arg(
         long,
         value_enum,
-        default_value_t = PatternArg::LongPeriod,
+        default_value_t = PatternArg::PeriodLong,
         help_heading = "Rendering Options"
     )]
     pub dark: PatternArg,

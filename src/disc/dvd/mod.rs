@@ -1,7 +1,7 @@
 mod efmplus;
 mod scramble;
 
-use efmplus::{EFMPlusStateMachine, EFMPlusStrategy, BinaryTransitionDensity};
+use efmplus::{EFMPlusStateMachine, EFMPlusStrategy};
 use scramble::SCRAMBLE_LUT;
 
 use crate::disc::pattern::Pattern;
@@ -200,6 +200,105 @@ pub fn generate_sector(
     // CPR_MAI
     for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
 
+    let scramble_table = &SCRAMBLE_LUT[((psn >> 4) & 0x0F) as usize];
+    // Start byte sampling
+    let mut chunk = [0u8; MAIN_DATA_SIZE];
+
+    /*
+        First Row is | SYNC 2 | SECTOR INFO + IED + CPR_MAI 12 | 79 | SYNC 2 | 81 | PI/PO 10 |
+        Final Row is 91 | 77 | EDC 4 |
+    */
+    const FRAME_MAIN_DATA_LENS: [usize; 24] = [
+        79, 81,
+        91, 81, 91, 81, 91, 81, 91, 81, 91, 81,
+        91, 81, 91, 81, 91, 81, 91, 81, 91, 81,
+        91, 77,
+    ];
+    const TARGET_BLOCK_SIZE: usize = 6;
+
+    let mut i: usize = 0;
+    for (frame_idx, &frame_len) in FRAME_MAIN_DATA_LENS.iter().enumerate() {
+        if frame_idx > 0 {
+            state.reset();
+        }
+        let mut rem = frame_len;
+        while rem > 0 {
+            let block_len = if rem <= TARGET_BLOCK_SIZE + 2 {
+                rem
+            } else if rem == 9 {
+                5
+            } else {
+                TARGET_BLOCK_SIZE
+            };
+            let mid_channel_word = main_to_channel_word_index(i as u64) + (block_len as u64) / 2;
+            let abs_pos = (sector_num as u64) * PHYSICAL_SECTOR_CHANNEL_WORDS + mid_channel_word;
+            let coord = disc.channel_word_to_polar_coord(abs_pos);
+            let luma = picture.sample_polar(coord);
+
+            let address_base = sector_num as u64 * MAIN_DATA_SIZE as u64;
+            let pattern = if dither.dither(luma, address_base + i as u64) {
+                light
+            } else {
+                dark
+            };
+
+            for _ in 0..block_len {
+                let next_byte = match pattern {
+                    Pattern::Random => {
+                        random.sample(address_base + i as u64, scramble_table[i])
+                    },
+                    v => {
+                        EFMPlusStrategy::choose(state.state(), v)
+                    }
+                };
+                state.next(next_byte);
+                chunk[i] = next_byte ^ scramble_table[i];
+                i += 1;
+            }
+            rem -= block_len;
+        }
+    }
+    
+    chunk
+}
+
+pub fn generate_sector_bytewise(
+    disc: &DvdDisc,
+    picture: &DiscPicture,
+    dither: &Dither,
+    random: &Random,
+    light: Pattern,
+    dark: Pattern,
+    sector_num: usize,
+) -> [u8; MAIN_DATA_SIZE] {
+
+    // Set EFM Plus state machine by 12 bytes
+    let mut state = EFMPlusStateMachine::new();
+
+    // Sector ID
+    state.next(disc.disc_type().default_sector_id_info_byte());
+    let psn: u64 = sector_num as u64 + 0x30000;
+    state.next(((psn >> 16) & 0xFF) as u8);
+    state.next(((psn >> 8) & 0xFF) as u8);
+    state.next((psn & 0xFF) as u8);
+
+    /*
+        TODO: Finish IED Calculation
+        Without IED calculation, the EFM Plus state can not be predicted correctly for first recording frame.
+
+        But all bytes are selected for returning to state 1.
+        The current EFM Plus strategy guarantees that we sync back to state 1
+        in at most 2 controlable bytes. Which is first 2 bytes in main data.
+
+        So I just set IED to 0x00. That's fine, state machine will recover in
+        2 bytes anyway.
+    */
+
+    state.next(0x00);
+    state.next(0x00);
+    // CPR_MAI
+    for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
+
     // Initialize image luma sampling first
     // const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
     // const IMAGE_SAMPLES_LEN: usize = PHYSICAL_SECTOR_CHANNEL_WORDS as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
@@ -251,15 +350,12 @@ pub fn generate_sector(
         };
 
         let next_byte = match pattern {
-            Pattern::ShortPeriod => {
-                EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::ShortPeriod)
-            },
-            Pattern::LongPeriod => {
-                EFMPlusStrategy::choose(state.state(), BinaryTransitionDensity::LongPeriod)
-            },
             Pattern::Random => {
                 random.sample(abs_address, scramble_table[i])
             },
+            v => {
+                EFMPlusStrategy::choose(state.state(), v)
+            }
         };
         
         state.next(next_byte);
