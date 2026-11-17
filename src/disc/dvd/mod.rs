@@ -10,6 +10,7 @@ use crate::geometry::{CorrectedSpiralGeometry, PolarCoord};
 use crate::dither::{Dither};
 use crate::profile::{DiscType, ProfileError};
 use crate::random::Random;
+use crate::sampler::PatternSampler;
 
 
 pub const MAIN_DATA_SIZE: usize         = 2048;
@@ -163,13 +164,10 @@ impl DvdDisc {
     }
 }
 
-pub fn generate_sector(
+pub fn generate_sector<S: PatternSampler>(
     disc: &DvdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
+    sampler: &S,
     random: &Random,
-    light: Pattern,
-    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MAIN_DATA_SIZE] {
 
@@ -233,14 +231,9 @@ pub fn generate_sector(
             let mid_channel_word = main_to_channel_word_index(i as u64) + (block_len as u64) / 2;
             let abs_pos = (sector_num as u64) * PHYSICAL_SECTOR_CHANNEL_WORDS + mid_channel_word;
             let coord = disc.channel_word_to_polar_coord(abs_pos);
-            let luma = picture.sample_polar(coord);
-
+            
             let address_base = sector_num as u64 * MAIN_DATA_SIZE as u64;
-            let pattern = if dither.dither(luma, address_base + i as u64) {
-                light
-            } else {
-                dark
-            };
+            let pattern = sampler.sample(coord, address_base + i as u64);
 
             for _ in 0..block_len {
                 let next_byte = match pattern {

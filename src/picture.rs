@@ -2,6 +2,7 @@ use image::{DynamicImage, GrayImage};
 
 use crate::geometry::PolarCoord;
 
+#[derive(Clone)]
 pub struct DiscPicture {
     image: GrayImage,
     width: u32,    

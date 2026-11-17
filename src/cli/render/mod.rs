@@ -11,6 +11,7 @@ use discscape::dither::Dither;
 use discscape::profile::DiscProfile;
 use discscape::picture::DiscPicture;
 use discscape::random::Random;
+use discscape::sampler::GrayscaleSampler;
 use image::ImageReader;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -35,7 +36,7 @@ pub enum PatternArg {
     #[value(name = "short", alias = "4t", alias = "s")]
     PeriodShort,
     /// Medium-period modulation pattern
-    #[value(name = "medium", alias = "5t", alias = "6t", alias = "s")]
+    #[value(name = "medium", alias = "5t", alias = "6t", alias = "m")]
     PeriodMedium,
     /// Long-period modulation pattern
     #[value(name = "long", alias = "8t", alias = "l")]
@@ -243,7 +244,7 @@ impl From<RandomArg> for Random {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseRandomArgError {
-    #[error("Unknown dither algorithm '{kind}'. Expected 'scramble' or 'splitmix64[:seed]'")]
+    #[error("Unknown random algorithm '{kind}'. Expected 'scramble' or 'splitmix64[:seed]'")]
     UnknownKind { kind: String },
 
     #[error("Random mode '{kind}' does not accept a parameter (got '{param}')")]
@@ -260,6 +261,34 @@ pub enum ParseRandomArgError {
     }
 }
 
+#[derive(Debug, Args)]
+pub struct CommonRenderArgs {
+    /// Path to the disc profile document
+    #[arg(long, short = 'p', value_name = "FILE")]
+    pub profile: std::path::PathBuf,
+
+    /// Output sector data format
+    #[arg(long)]
+    pub format: Option<CdFormat>,
+
+    /// Starting logical block address (LBA) on the disc (inclusive)
+    #[arg(long, value_name = "N")]
+    pub start_sector: Option<u64>,
+
+    /// Ending logical block address (LBA) on the disc (exclusive)
+    #[arg(long, value_name = "N")]
+    pub end_sector: Option<u64>,
+
+    /// Broadband generator for 'random' pattern: 'scramble' or 'splitmix64[:seed]'
+    #[arg(
+        long,
+        default_value_t,
+        value_name = "SPEC",
+        help_heading = "Rendering Options"
+    )]
+    pub random: RandomArg,
+}
+
 /*
     Render command args
 */
@@ -272,21 +301,8 @@ pub struct RenderArgs {
     /// Path to the output disc image file. Use '-' for output to stdout
     pub output: String,
 
-    /// Path to the disc profile document
-    #[arg(long, short = 'p', value_name = "FILE")]
-    pub profile: std::path::PathBuf,
-
-    /// Output sector data format
-    #[arg(long)]
-    pub format: Option<CdFormat>,
-
-    /// Starting logical block address (LBA) on the disc (inclusive)
-    #[arg(long, value_name = "N")]
-    pub start_sector: Option<u64>,
-    
-    /// Ending logical block address (LBA) on the disc (exclusive)
-    #[arg(long, value_name = "N")]
-    pub end_sector: Option<u64>,
+    #[command(flatten)]
+    pub common_args: CommonRenderArgs,
 
     /// Optical pattern for light pixels
     #[arg(
@@ -314,15 +330,6 @@ pub struct RenderArgs {
         help_heading = "Rendering Options"
     )]
     pub dither: DitherArg,
-
-    /// Broadband generator for 'random' pattern: 'scramble' or 'splitmix64[:seed]'
-    #[arg(
-        long,
-        default_value_t,
-        value_name = "SPEC",
-        help_heading = "Rendering Options"
-    )]
-    pub random: RandomArg,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -336,17 +343,20 @@ pub enum RenderError {
 }
 
 pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
-    let profile_content = std::fs::read_to_string(&args.profile)
-        .with_context(|| format!("Failed to read profile file at '{}'", args.profile.display()))?;
+
+    let common = args.common_args;
+
+    let profile_content = std::fs::read_to_string(&common.profile)
+        .with_context(|| format!("Failed to read profile file at '{}'", common.profile.display()))?;
     let profile: DiscProfile = serde_json::from_str(&profile_content)
-        .with_context(|| format!("Failed to parse JSON in profile '{}'", args.profile.display()))?;
+        .with_context(|| format!("Failed to parse JSON in profile '{}'", common.profile.display()))?;
 
     let disc = Disc::try_from(profile)?.with_lut_correction(0.1);
     let capacity = disc.sectors();
 
     /* Sector size assertion */
-    let start_sector = args.start_sector.unwrap_or(0);
-    let end_sector = args.end_sector.unwrap_or(capacity);
+    let start_sector = common.start_sector.unwrap_or(0);
+    let end_sector = common.end_sector.unwrap_or(capacity);
     if start_sector >= end_sector {
         return Err(RenderError::InvalidSectorRange { start: start_sector, end: end_sector }.into())
     }
@@ -355,9 +365,10 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
     }
     
     let dither = Dither::from(args.dither);
-    let random = Random::from(args.random);
+    let random = Random::from(common.random);
     let light = Pattern::from(args.light);
     let dark = Pattern::from(args.dark);
+
     let use_random = light == Pattern::Random || dark == Pattern::Random;
 
     if light == dark {
@@ -374,6 +385,13 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
         .with_context(|| format!("Failed to decode image file'{}'", args.image.display()))?;
     let picture = DiscPicture::new(image.grayscale());
 
+    let sampler = GrayscaleSampler {
+        picture: picture.clone(),
+        dither,
+        light,
+        dark,
+    };
+
     let inner: Box<dyn Write> = if &args.output == "-" {
         Box::new(std::io::stdout().lock())
     } else {
@@ -385,7 +403,7 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
 
     match disc {
         Disc::Cd(disc) => {
-            let format = args.format.ok_or(RenderError::MissingCdFormat)?;
+            let format = common.format.ok_or(RenderError::MissingCdFormat)?;
 
             if format == CdFormat::Audio && use_random && matches!(random, Random::Scramble) {
                 eprintln!("[WARN] CD Audio has no data scrambler; '--random scramble' will emit constant 0x00 bytes (periodic EFM symbols, not broadband scatter). Consider '--random splitmix64' instead.");
@@ -394,33 +412,33 @@ pub fn render_command(args: RenderArgs) -> anyhow::Result<()> {
             match format {
                 CdFormat::Audio => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_audio_chunk(&disc, &picture, &dither, &random, light, dark, i)
+                        cd::generate_audio_chunk(&disc, &sampler, &random, i)
                     )?;
                 }
                 CdFormat::Mode1_2352 => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_mode1_2352_chunk(&disc, &picture, &dither, &random, light, dark, i)
+                        cd::generate_mode1_2352_chunk(&disc, &sampler, &random, i)
                     )?;
                 }
                 CdFormat::Mode1_2048 => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_mode1_2048_chunk(&disc, &picture, &dither, &random, light, dark, i)
+                        cd::generate_mode1_2048_chunk(&disc, &sampler, &random, i)
                     )?;
                 }
                 CdFormat::Mode2_2336 => {
                     render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_mode2_2336_chunk(&disc, &picture, &dither, &random, light, dark, i)
+                        cd::generate_mode2_2336_chunk(&disc, &sampler, &random, i)
                     )?;
                 }
             }
         },
         Disc::Dvd(disc) => {
-            if let Some(fmt) = args.format {
+            if let Some(fmt) = common.format {
                 eprintln!("[WARN] '--format {fmt:?}' is ignored because the loaded profile is for a DVD.");
             }
 
             render_sectors(&mut writer, start_sector, end_sector, |i|
-                dvd::generate_sector(&disc, &picture, &dither, &random, light, dark, i)
+                dvd::generate_sector(&disc, &sampler, &random, i)
             )?;
         },
     }

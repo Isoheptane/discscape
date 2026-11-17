@@ -1,8 +1,7 @@
 use crate::disc::pattern::Pattern;
-use crate::dither::Dither;
-use crate::picture::DiscPicture;
 use crate::geometry::{CorrectedSpiralGeometry, PolarCoord, SpiralGeometry};
 use crate::random::Random;
+use crate::sampler::PatternSampler;
 
 pub const SECTOR_SIZE_BYTES:        usize = 2352;
 pub const SYNC_SIZE_BYTES:          usize = 12;
@@ -207,19 +206,16 @@ fn u8_to_bcd(val: u8) -> u8 {
 }
 
 #[inline]
-fn sample_image_luma(
+fn sample_image_coord(
     disc: &CdDisc,
-    image: &DiscPicture,
     byte_idx: u64,
     cdrom: bool
-) -> u8 {
-    let coord = if cdrom {
+) -> PolarCoord {
+    if cdrom {
         disc.le_bin_to_polar_coord(byte_idx).expect("Invalid CD-ROM byte index for polar mapping")
     } else {
         disc.be_bin_to_polar_coord(byte_idx).expect("Invalid audio byte index for polar mapping")
-    };
-
-    return image.sample_polar(coord);
+    }
 }
 
 #[inline]
@@ -236,13 +232,10 @@ fn select_byte(pattern: Pattern, random: &Random, abs_address: u64, scramble: u8
 }
 
 /// Generates a full audio sector
-pub fn generate_audio_chunk(
+pub fn generate_audio_chunk<S: PatternSampler>(
     disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
+    sampler: &S,
     random: &Random,
-    light: Pattern,
-    dark: Pattern,
     sector_num: usize,
 ) -> [u8; AUDIO_CHUNK_SIZE] {
     let mut chunk = [0; AUDIO_CHUNK_SIZE];
@@ -250,13 +243,8 @@ pub fn generate_audio_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..AUDIO_CHUNK_SIZE {
         let abs_address = sector_base as u64 + i as u64;
-        let luma = sample_image_luma(disc, picture, abs_address, false);
-        let pattern = if dither.dither(luma, abs_address) {
-            light
-        } else {
-            dark
-        };
-
+        let coord = sample_image_coord(disc, abs_address, false);
+        let pattern = sampler.sample(coord, abs_address);
         let next_byte = select_byte(pattern, random, abs_address, 0x00);
         
         chunk[i] = next_byte;
@@ -266,13 +254,10 @@ pub fn generate_audio_chunk(
 }
 
 /// Generates a RAW MODE1/2352 chunk, but L-EC information is filled with image data
-pub fn generate_mode1_2352_chunk(
+pub fn generate_mode1_2352_chunk<S: PatternSampler>(
     disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
+    sampler: &S,
     random: &Random,
-    light: Pattern,
-    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MODE1_2352_CHUNK_SIZE] {
     let mut chunk = [0; MODE1_2352_CHUNK_SIZE];
@@ -290,13 +275,8 @@ pub fn generate_mode1_2352_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 16..MODE1_2352_CHUNK_SIZE {
         let abs_address = sector_base as u64 + i as u64;
-        let luma = sample_image_luma(disc, picture, abs_address, false);
-        let pattern = if dither.dither(luma, abs_address) {
-            light
-        } else {
-            dark
-        };
-
+        let coord = sample_image_coord(disc, abs_address, false);
+        let pattern = sampler.sample(coord, abs_address);
         let next_byte = select_byte(pattern, random, abs_address, SCRAMBLE_TABLE[i - 12]);
         
         chunk[i] = next_byte ^ SCRAMBLE_TABLE[i - 12];
@@ -306,13 +286,10 @@ pub fn generate_mode1_2352_chunk(
 }
 
 /// Generates a RAW MODE1/2048 chunk
-pub fn generate_mode1_2048_chunk(
+pub fn generate_mode1_2048_chunk<S: PatternSampler>(
     disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
+    sampler: &S,
     random: &Random,
-    light: Pattern,
-    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MODE1_2048_CHUNK_SIZE] {
     let mut chunk = [0; MODE1_2048_CHUNK_SIZE];
@@ -320,13 +297,8 @@ pub fn generate_mode1_2048_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE1_2048_CHUNK_SIZE {
         let abs_address = sector_base as u64 + i as u64 + 16;
-        let luma = sample_image_luma(disc, picture, abs_address, false);
-        let pattern = if dither.dither(luma, abs_address) {
-            light
-        } else {
-            dark
-        };
-
+        let coord = sample_image_coord(disc, abs_address, false);
+        let pattern = sampler.sample(coord, abs_address);
         let next_byte = select_byte(pattern, random, abs_address, SCRAMBLE_TABLE[i + 4]);
         
         chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
@@ -335,14 +307,10 @@ pub fn generate_mode1_2048_chunk(
     chunk
 }
 
-/// Generates a RAW MODE2/2336 chunk
-pub fn generate_mode2_2336_chunk(
+pub fn generate_mode2_2336_chunk<S: PatternSampler>(
     disc: &CdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
+    sampler: &S,
     random: &Random,
-    light: Pattern,
-    dark: Pattern,
     sector_num: usize,
 ) -> [u8; MODE2_2336_CHUNK_SIZE] {
     let mut chunk = [0; MODE2_2336_CHUNK_SIZE];
@@ -350,13 +318,8 @@ pub fn generate_mode2_2336_chunk(
     let sector_base = sector_num * SECTOR_SIZE_BYTES;
     for i in 0..MODE2_2336_CHUNK_SIZE {
         let abs_address = sector_base as u64 + i as u64 + 16;
-        let luma = sample_image_luma(disc, picture, abs_address, false);
-        let pattern = if dither.dither(luma, abs_address) {
-            light
-        } else {
-            dark
-        };
-
+        let coord = sample_image_coord(disc, abs_address, false);
+        let pattern = sampler.sample(coord, abs_address);
         let next_byte = select_byte(pattern, random, abs_address, SCRAMBLE_TABLE[i + 4]);
         
         chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
