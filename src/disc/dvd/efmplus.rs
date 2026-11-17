@@ -1,4 +1,4 @@
-use crate::disc::pattern::Pattern;
+use crate::disc::pattern::BasePeriod;
 
 // Generated from the supplied 256-row EFMPlus table.
 // Index: [current_state as usize][input_byte as usize].
@@ -147,7 +147,7 @@ impl EFMPlusStrategy {
     ];
 
     #[inline]
-    pub const fn choose(state: EFMPlusState, pattern: Pattern) -> u8 {
+    pub const fn choose(state: EFMPlusState, pattern: BasePeriod) -> u8 {
         Self::TRANSITION_STRATEGY[state as usize][pattern as usize]
     }
 }

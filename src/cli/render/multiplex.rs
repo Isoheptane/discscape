@@ -3,7 +3,9 @@ use std::str::{FromStr};
 
 use anyhow::Context;
 use clap::{Args, ValueEnum};
-use discscape::{disc::pattern::Pattern, picture::DiscPicture, sampler::MultiplexSampler};
+use discscape::sampler::MultiplexSampler;
+use discscape::picture::DiscPicture;
+use discscape::disc::pattern::Pattern;
 use image::ImageReader;
 use crate::cli::render::{CommonRenderArgs, PatternArg, common_render_command};
 
@@ -109,6 +111,27 @@ pub struct RenderMultiplexArgs {
         help_heading = "Rendering Options"
     )]
     pub dump: PatternArg,
+
+    #[arg(
+        long,
+        default_value_t = 0x114514,
+        value_name = "SEED",
+        help_heading = "Rendering Options",
+        value_parser = hex_parser
+    )]
+    pub dither_seed: u64,
+}
+
+fn hex_parser(s: &str) -> Result<u64, String> {
+    if s.starts_with("0x") {
+        u64::from_str_radix(s.trim_start_matches("0x"), 16).map_err(|_| {
+            format!("Invalid dither seed, expected decimal or 0x-prefixed hex seed (get {s})")
+        })
+    } else {
+        u64::from_str_radix(s, 10).map_err(|_| {
+            format!("Invalid dither seed, expected decimal or 0x-prefixed hex seed (get {s})")
+        })
+    }
 }
 
 pub fn render_multiplex_command(args: RenderMultiplexArgs) -> anyhow::Result<()> {
@@ -129,10 +152,7 @@ pub fn render_multiplex_command(args: RenderMultiplexArgs) -> anyhow::Result<()>
     }
 
     // Allow seed later
-    let sampler = MultiplexSampler::new(pats, args.dump.into(), 0x114514);
-
-    eprintln!("{:#?}", sampler.channels[0].weight_per_luma);
-    eprintln!("{:#?}", sampler.channels[1].weight_per_luma);
+    let sampler = MultiplexSampler::new(pats, args.dump.into(), args.dither_seed);
 
     common_render_command(common, sampler)
 }

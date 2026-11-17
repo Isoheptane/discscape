@@ -31,17 +31,51 @@ pub enum CdFormat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum PatternArg {
     /// Shortest-period modulation pattern
-    #[value(name = "shortest", alias = "3t", alias = "xs")]
+    #[value(name = "shortest", alias = "3t", alias = "xs", alias = "p0")]
     PeriodShortest,
+    #[value(name = "x5s1", alias = "p1", hide = true)]
+    MacroX5S1,
+    #[value(name = "x4s2", alias = "p2", hide = true)]
+    MacroX4S2,
+    #[value(name = "x3s3", alias = "p3", hide = true)]
+    MacroX3S3,
+    #[value(name = "x2s4", alias = "p4", hide = true)]
+    MacroX2S4,
+    #[value(name = "x1s5", alias = "p5", hide = true)]
+    MacroX1S5,
+
     /// Short-period modulation pattern
-    #[value(name = "short", alias = "4t", alias = "s")]
+    #[value(name = "short", alias = "4t", alias = "s", alias = "p6")]
     PeriodShort,
+    #[value(name = "s5m1", alias = "p7", hide = true)]
+    MacroS5M1,
+    #[value(name = "s4m2", alias = "p8", hide = true)]
+    MacroS4M2,
+    #[value(name = "s3m3", alias = "p9", hide = true)]
+    MacroS3M3,
+    #[value(name = "s2m4", alias = "p10", hide = true)]
+    MacroS2M4,
+    #[value(name = "s1m5", alias = "p11", hide = true)]
+    MacroS1M5,
+
     /// Medium-period modulation pattern
-    #[value(name = "medium", alias = "5t", alias = "6t", alias = "m")]
+    #[value(name = "medium", alias = "5t", alias = "6t", alias = "m", alias = "p12")]
     PeriodMedium,
+    #[value(name = "m5l1", alias = "p13", hide = true)]
+    MacroM5L1,
+    #[value(name = "m4l2", alias = "p14", hide = true)]
+    MacroM4L2,
+    #[value(name = "m3l3", alias = "p15", hide = true)]
+    MacroM3L3,
+    #[value(name = "m2l4", alias = "p16", hide = true)]
+    MacroM2L4,
+    #[value(name = "m1l5", alias = "p17", hide = true)]
+    MacroM1L5,
+
     /// Long-period modulation pattern
-    #[value(name = "long", alias = "8t", alias = "l")]
+    #[value(name = "long", alias = "8t", alias = "l", alias = "p18")]
     PeriodLong,
+    
     /// Broadband / aperiodic scatter pattern, configured via --random
     #[value(name = "random", alias = "broadband", alias = "diffuse")]
     Random,
@@ -51,8 +85,23 @@ impl From<PatternArg> for Pattern {
     fn from(arg: PatternArg) -> Self {
         match arg {
             PatternArg::PeriodShortest  => Pattern::PeriodShortest,
+            PatternArg::MacroX5S1       => Pattern::MacroX5S1,
+            PatternArg::MacroX4S2       => Pattern::MacroX4S2,
+            PatternArg::MacroX3S3       => Pattern::MacroX3S3,
+            PatternArg::MacroX2S4       => Pattern::MacroX2S4,
+            PatternArg::MacroX1S5       => Pattern::MacroX1S5,
             PatternArg::PeriodShort     => Pattern::PeriodShort,
+            PatternArg::MacroS5M1       => Pattern::MacroS5M1,
+            PatternArg::MacroS4M2       => Pattern::MacroS4M2,
+            PatternArg::MacroS3M3       => Pattern::MacroS3M3,
+            PatternArg::MacroS2M4       => Pattern::MacroS2M4,
+            PatternArg::MacroS1M5       => Pattern::MacroS1M5,
             PatternArg::PeriodMedium    => Pattern::PeriodMedium,
+            PatternArg::MacroM5L1       => Pattern::MacroM5L1,
+            PatternArg::MacroM4L2       => Pattern::MacroM4L2,
+            PatternArg::MacroM3L3       => Pattern::MacroM3L3,
+            PatternArg::MacroM2L4       => Pattern::MacroM2L4,
+            PatternArg::MacroM1L5       => Pattern::MacroM1L5,
             PatternArg::PeriodLong      => Pattern::PeriodLong,
             PatternArg::Random          => Pattern::Random,
         }

@@ -235,14 +235,12 @@ pub fn generate_sector<S: PatternSampler>(
             let address_base = sector_num as u64 * MAIN_DATA_SIZE as u64;
             let pattern = sampler.sample(coord, address_base + i as u64);
 
-            for _ in 0..block_len {
+            for sub_idx in 0..block_len {
                 let next_byte = match pattern {
                     Pattern::Random => {
                         random.sample(address_base + i as u64, scramble_table[i])
                     },
-                    v => {
-                        EFMPlusStrategy::choose(state.state(), v)
-                    }
+                    v => EFMPlusStrategy::choose(state.state(), v.base_period_at(sub_idx))
                 };
                 state.next(next_byte);
                 chunk[i] = next_byte ^ scramble_table[i];
@@ -346,9 +344,7 @@ pub fn generate_sector_bytewise(
             Pattern::Random => {
                 random.sample(abs_address, scramble_table[i])
             },
-            v => {
-                EFMPlusStrategy::choose(state.state(), v)
-            }
+            v => EFMPlusStrategy::choose(state.state(), v.base_period_at(0))
         };
         
         state.next(next_byte);
