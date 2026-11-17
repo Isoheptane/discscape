@@ -2,7 +2,7 @@ use image::{DynamicImage, GrayImage};
 
 use crate::geometry::PolarCoord;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DiscPicture {
     image: GrayImage,
     width: u32,    
@@ -34,7 +34,8 @@ impl DiscPicture {
         let x = x.clamp(0, self.width as i32 - 1) as u32;
         let y = y.clamp(0, self.height as i32 - 1) as u32;
         
-        self.image.get_pixel(x, y).0[0]
+        let luma = self.image.get_pixel(x, y).0[0] as u32;
+        ((luma * luma) / 255) as u8
     }
 }
 

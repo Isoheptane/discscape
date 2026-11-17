@@ -6,9 +6,11 @@ use crate::random::splitmix64_hash;
 
 pub trait PatternSampler {
     fn sample(&self, coord: PolarCoord, addr: u64) -> Pattern;
+
+    fn use_random(&self) -> bool;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GrayscaleSampler {
     pub picture: DiscPicture,
     pub dither: Dither,
@@ -26,16 +28,22 @@ impl PatternSampler for GrayscaleSampler {
             self.dark
         }
     }
+    
+    fn use_random(&self) -> bool {
+        self.light == Pattern::Random || self.dark == Pattern::Random
+    }
+
+    
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct MultiplexChannel {
     pub pattern: Pattern,
     pub picture: DiscPicture,
     pub weight_per_luma: u32,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct MultiplexSampler {
     pub channels: Vec<MultiplexChannel>,
     pub dump: Pattern,
@@ -82,4 +90,15 @@ impl PatternSampler for MultiplexSampler {
 
         self.dump
     }
+    
+    fn use_random(&self) -> bool {
+        for ch in &self.channels {
+            if ch.pattern == Pattern::Random {
+                return true;
+            }
+        }
+        false
+    }
+
+    
 }
