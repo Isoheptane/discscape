@@ -25,6 +25,13 @@ const EFM_BYTE_PERIOD_MEDIUM:       u8 = 0x74;
 /// 00000000100000 
 const EFM_BYTE_PERIOD_LONG:         u8 = 0x20;
 
+const EFM_BYTE_SELECT_TABLE: [u8; 4] = [
+    EFM_BYTE_PERIOD_SHORTEST,
+    EFM_BYTE_PERIOD_SHORT,
+    EFM_BYTE_PERIOD_MEDIUM,
+    EFM_BYTE_PERIOD_LONG,
+];
+
 pub type FramePosition = (i64, u8);
 
 /// The mapping table for F1 to F3 frame mapping
@@ -208,22 +215,62 @@ fn u8_to_bcd(val: u8) -> u8 {
 #[inline]
 fn select_byte(
     pattern: Pattern,
-    pos: FramePosition,
+    orig_pos: FramePosition,
     random: &Random,
     abs_address: u64,
     scramble: u8
 ) -> u8 {
-
-    const SELECT_TABLE: [u8; 4] = [
-        EFM_BYTE_PERIOD_SHORTEST,
-        EFM_BYTE_PERIOD_SHORT,
-        EFM_BYTE_PERIOD_MEDIUM,
-        EFM_BYTE_PERIOD_LONG,
-    ];
-
     match pattern {
-        Pattern::Random => random.sample(abs_address, scramble),
-        v => SELECT_TABLE[v.base_period_at(pos.1 as usize) as usize]
+        Pattern::Random => {
+            random.sample(abs_address, scramble)
+        },
+        v => {
+            EFM_BYTE_SELECT_TABLE[v.base_period_at(orig_pos.1 as usize) as usize]
+        }
+    }
+}
+
+// Common sector filling logic
+fn fill_sector_region<S: PatternSampler>(
+    disc: &CdDisc,
+    sampler: &S,
+    random: &Random,
+    sector_num: usize,
+    dst: &mut [u8],
+    sector_offset_base: usize,
+    cdrom: bool,
+    scrambled: bool,
+) {
+    let sector_base = sector_num as u64 * SECTOR_SIZE_BYTES as u64 + sector_offset_base as u64;
+
+    for (idx, out) in dst.iter_mut().enumerate() {
+        let abs_address = sector_base + idx as u64;
+        let orig_pos = if cdrom {
+            le_bin_to_f3(abs_address)
+        } else {
+            be_bin_to_f3(abs_address)
+        }
+        .expect("Invalid CD byte index for polar mapping");
+
+        let (frame, byte) = orig_pos;
+
+        let center_idx = (byte / 6) * 6 + 3;
+        let sample_pos = (frame, center_idx);
+        // Use group number instead of 
+        let dither_addr =  frame as u64 * F1_FRAME_SIZE_BYTES as u64 + center_idx as u64;
+
+        let coord = disc.f3_to_polar_coord(sample_pos)
+            .expect("Invalid CD Audio byte index for polar mapping");
+        let pattern = sampler.sample(coord, dither_addr);
+
+        let scramble = if scrambled {
+            SCRAMBLE_TABLE[SECTOR_SIZE_BYTES + idx - 12]
+        } else  {
+            0x00   
+        };
+
+        let next_byte = select_byte(pattern, orig_pos, random, abs_address, scramble);
+        *out = next_byte ^ scramble
     }
 }
 
@@ -235,19 +282,7 @@ pub fn generate_audio_chunk<S: PatternSampler>(
     sector_num: usize,
 ) -> [u8; AUDIO_CHUNK_SIZE] {
     let mut chunk = [0; AUDIO_CHUNK_SIZE];
-
-    let sector_base = sector_num * SECTOR_SIZE_BYTES;
-    for i in 0..AUDIO_CHUNK_SIZE {
-        let abs_address = sector_base as u64 + i as u64;
-        let pos = be_bin_to_f3(abs_address).expect("Invalid CD Audio byte index for polar mapping");
-        let coord = disc.f3_to_polar_coord(pos).expect("Invalid CD Audio byte index for polar mapping");
-
-        let pattern = sampler.sample(coord, abs_address);
-        let next_byte = select_byte(pattern, pos, random, abs_address, 0x00);
-        
-        chunk[i] = next_byte;
-    }
-
+    fill_sector_region(disc, sampler, random, sector_num, &mut chunk, 0, false, false);
     chunk
 }
 
@@ -270,18 +305,7 @@ pub fn generate_mode1_2352_chunk<S: PatternSampler>(
     chunk[14] = u8_to_bcd((msf % 75) as u8);
     chunk[15] = 0x01;
 
-    let sector_base = sector_num * SECTOR_SIZE_BYTES;
-    for i in 16..MODE1_2352_CHUNK_SIZE {
-        let abs_address = sector_base as u64 + i as u64;
-        let pos = le_bin_to_f3(abs_address).expect("Invalid CD-ROM byte index for polar mapping");
-        let coord = disc.f3_to_polar_coord(pos).expect("Invalid CD-ROM byte index for polar mapping");
-
-        let pattern = sampler.sample(coord, abs_address);
-        let next_byte = select_byte(pattern, pos, random, abs_address, SCRAMBLE_TABLE[i - 12]);
-        
-        chunk[i] = next_byte ^ SCRAMBLE_TABLE[i - 12];
-    }
-
+    fill_sector_region(disc, sampler, random, sector_num, &mut chunk[16..], 16, true, true);
     chunk
 }
 
@@ -306,6 +330,7 @@ pub fn generate_mode1_2048_chunk<S: PatternSampler>(
         chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
     }
 
+    fill_sector_region(disc, sampler, random, sector_num, &mut chunk, 16, true, true);
     chunk
 }
 
@@ -317,16 +342,6 @@ pub fn generate_mode2_2336_chunk<S: PatternSampler>(
 ) -> [u8; MODE2_2336_CHUNK_SIZE] {
     let mut chunk = [0; MODE2_2336_CHUNK_SIZE];
 
-    let sector_base = sector_num * SECTOR_SIZE_BYTES;
-    for i in 0..MODE2_2336_CHUNK_SIZE {
-        let abs_address = sector_base as u64 + i as u64;
-        let pos = le_bin_to_f3(abs_address).expect("Invalid CD-ROM byte index for polar mapping");
-        let coord = disc.f3_to_polar_coord(pos).expect("Invalid CD-ROM byte index for polar mapping");
-
-        let pattern = sampler.sample(coord, abs_address);
-        let next_byte = select_byte(pattern, pos, random, abs_address, SCRAMBLE_TABLE[i + 4]);
-        
-        chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
-    }
+    fill_sector_region(disc, sampler, random, sector_num, &mut chunk[16..], 16, true, true);
     chunk
 }
