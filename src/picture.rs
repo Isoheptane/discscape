@@ -1,6 +1,6 @@
 use image::{DynamicImage, GrayImage};
 
-use crate::geometry::PolarCoord;
+use crate::geometry::{CartesianCoord, PolarCoord, polar_to_cartesian};
 
 #[derive(Debug, Clone)]
 pub struct DiscPicture {
@@ -9,6 +9,8 @@ pub struct DiscPicture {
     height: u32,
     scale_x: f64,
     scale_y: f64,
+    offset_x: f64,
+    offset_y: f64,
 }
 
 impl DiscPicture {
@@ -20,42 +22,30 @@ impl DiscPicture {
         let scale_x = width as f64 / 120.0;
         let scale_y = height as f64 / 120.0;
 
-        Self { image: luma, width, height, scale_x, scale_y }
+        let offset_x  = width as f64 * 0.5;
+        let offset_y  = width as f64 * 0.5;
+
+        Self { image: luma, width, height, scale_x, scale_y, offset_x, offset_y }
     }
 
     #[inline]
-    pub fn sample_polar(&self, coord: PolarCoord) -> u8 {
-        let (r, rev) = coord;
+    pub fn sample_cartesian(&self, coord: CartesianCoord) -> u8 {
+        let (x_mm, y_mm) = coord;
 
-        let (sin_theta, cos_theta) = sin_cos_rev(rev);
-        let x = cos_theta.mul_add(r, 60.0).mul_add( self.scale_x, 0.5) as i32;
-        let y = sin_theta.mul_add(r, 60.0).mul_add( self.scale_y, 0.5) as i32;
+        let x = x_mm.mul_add(self.scale_x, self.offset_x) as i32;
+        let y = y_mm.mul_add(self.scale_y, self.offset_y) as i32;
 
         let x = x.clamp(0, self.width as i32 - 1) as u32;
         let y = y.clamp(0, self.height as i32 - 1) as u32;
         
         let luma = self.image.get_pixel(x, y).0[0] as u32;
+
+        // TODO: Change gamma correction to elsewhere
         ((luma * luma) / 255) as u8
     }
-}
 
-use crate::sin_table::{*};
-
-#[inline(always)]
-pub fn sin_cos_rev(rev: f64) -> (f64, f64) {
-    let phase = rev - rev.floor();
-
-    let pos = phase * LUT_SIZE as f64;
-    let idx = pos as usize;
-    let t = pos - idx as f64;
-
-    let s0 = SIN_LUT[idx];
-    let s1 = SIN_LUT[idx + 1];
-    let c0 = SIN_LUT[idx + LUT_QUARTER];
-    let c1 = SIN_LUT[idx + LUT_QUARTER + 1];
-
-    let sin = (s1 - s0).mul_add(t, s0);
-    let cos = (c1 - c0).mul_add(t, c0);
-
-    (sin, cos)
+    #[inline]
+    pub fn sample_polar(&self, coord: PolarCoord) -> u8 {
+        self.sample_cartesian(polar_to_cartesian(coord))
+    }
 }

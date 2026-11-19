@@ -1,4 +1,4 @@
-use crate::geometry::PolarCoord;
+use crate::geometry::{PolarCoord, polar_to_cartesian};
 use crate::picture::DiscPicture;
 use crate::dither::Dither;
 use crate::disc::pattern::Pattern;
@@ -79,9 +79,11 @@ impl PatternSampler for MultiplexSampler {
     fn sample(&self, coord: PolarCoord, addr: u64) -> Pattern {
         let hash = (splitmix64_hash(addr ^ self.seed) >> 32) as u32;
 
+        let planar = polar_to_cartesian(coord);
+
         let mut sum: u32 = 0;
         for ch in &self.channels {
-            let luma = ch.picture.sample_polar(coord) as u32;
+            let luma = ch.picture.sample_cartesian(planar) as u32;
             sum = sum.saturating_add(luma * ch.weight_per_luma);
             if hash < sum {
                 return ch.pattern

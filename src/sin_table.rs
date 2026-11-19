@@ -1,7 +1,7 @@
-pub const LUT_SIZE: usize = 1024;
-pub const LUT_QUARTER: usize = 256;
-pub const LUT_LEN: usize = 1281;
-pub static SIN_LUT: [f64; LUT_LEN] = [
+pub const SIN_LUT_SIZE: usize = 1024;
+pub const SIN_LUT_QUARTER: usize = 256;
+pub const SIN_LUT_LEN: usize = 1281;
+pub static SIN_LUT: [f64; SIN_LUT_LEN] = [
 f64::from_bits(0x0000000000000000),
 f64::from_bits(0x3f7921f0fe670071),
 f64::from_bits(0x3f8921d1fcdec784),
