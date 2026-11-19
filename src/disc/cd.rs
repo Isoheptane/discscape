@@ -280,10 +280,9 @@ pub fn generate_audio_chunk<S: PatternSampler>(
     sampler: &S,
     random: &Random,
     sector_num: usize,
-) -> [u8; AUDIO_CHUNK_SIZE] {
-    let mut chunk = [0; AUDIO_CHUNK_SIZE];
-    fill_sector_region(disc, sampler, random, sector_num, &mut chunk, 0, false, false);
-    chunk
+    chunk: &mut [u8; AUDIO_CHUNK_SIZE]
+) {
+    fill_sector_region(disc, sampler, random, sector_num, chunk, 0, false, false);
 }
 
 /// Generates a RAW MODE1/2352 chunk, but L-EC information is filled with image data
@@ -292,9 +291,8 @@ pub fn generate_mode1_2352_chunk<S: PatternSampler>(
     sampler: &S,
     random: &Random,
     sector_num: usize,
-) -> [u8; MODE1_2352_CHUNK_SIZE] {
-    let mut chunk = [0; MODE1_2352_CHUNK_SIZE];
-
+    chunk: &mut [u8; MODE1_2352_CHUNK_SIZE]
+) {
     let msf = sector_num + 150;
     let sec = msf / 75;
     let min = sec / 60;
@@ -306,7 +304,6 @@ pub fn generate_mode1_2352_chunk<S: PatternSampler>(
     chunk[15] = 0x01;
 
     fill_sector_region(disc, sampler, random, sector_num, &mut chunk[16..], 16, true, true);
-    chunk
 }
 
 /// Generates a RAW MODE1/2048 chunk
@@ -315,23 +312,9 @@ pub fn generate_mode1_2048_chunk<S: PatternSampler>(
     sampler: &S,
     random: &Random,
     sector_num: usize,
-) -> [u8; MODE1_2048_CHUNK_SIZE] {
-    let mut chunk = [0; MODE1_2048_CHUNK_SIZE];
-
-    let sector_base = sector_num * SECTOR_SIZE_BYTES;
-    for i in 0..MODE1_2048_CHUNK_SIZE {
-        let abs_address = sector_base as u64 + i as u64;
-        let pos = le_bin_to_f3(abs_address).expect("Invalid CD-ROM byte index for polar mapping");
-        let coord = disc.f3_to_polar_coord(pos).expect("Invalid CD-ROM byte index for polar mapping");
-
-        let pattern = sampler.sample(coord, abs_address);
-        let next_byte = select_byte(pattern, pos, random, abs_address, SCRAMBLE_TABLE[i + 4]);
-        
-        chunk[i] = next_byte ^ SCRAMBLE_TABLE[i + 4];
-    }
-
-    fill_sector_region(disc, sampler, random, sector_num, &mut chunk, 16, true, true);
-    chunk
+    chunk: &mut [u8; MODE1_2048_CHUNK_SIZE],
+) {
+    fill_sector_region(disc, sampler, random, sector_num, chunk, 16, true, true);
 }
 
 pub fn generate_mode2_2336_chunk<S: PatternSampler>(
@@ -339,9 +322,7 @@ pub fn generate_mode2_2336_chunk<S: PatternSampler>(
     sampler: &S,
     random: &Random,
     sector_num: usize,
-) -> [u8; MODE2_2336_CHUNK_SIZE] {
-    let mut chunk = [0; MODE2_2336_CHUNK_SIZE];
-
+    chunk: &mut [u8; MODE2_2336_CHUNK_SIZE],
+) {
     fill_sector_region(disc, sampler, random, sector_num, &mut chunk[16..], 16, true, true);
-    chunk
 }

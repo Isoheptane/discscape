@@ -5,6 +5,7 @@ use core::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::str::FromStr;
+use std::sync::mpsc;
 
 use anyhow::Context;
 use clap::Args;
@@ -15,6 +16,7 @@ use discscape::profile::DiscProfile;
 use discscape::random::Random;
 use discscape::sampler::PatternSampler;
 use indicatif::{ProgressBar, ProgressStyle};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum CdFormat {
@@ -352,7 +354,7 @@ pub enum RenderError {
     MissingCdFormat,
 }
 
-pub fn common_render_command<S: PatternSampler>(
+pub fn common_render_command<S: PatternSampler + Sync>(
     args: CommonRenderArgs,
     sampler: S
 ) -> anyhow::Result<()> {
@@ -395,23 +397,23 @@ pub fn common_render_command<S: PatternSampler>(
 
             match format {
                 CdFormat::Audio => {
-                    render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_audio_chunk(&disc, &sampler, &random, i)
+                    render_sectors(&mut writer, start_sector, end_sector, |i, out|
+                        cd::generate_audio_chunk(&disc, &sampler, &random, i, out)
                     )?;
                 }
                 CdFormat::Mode1_2352 => {
-                    render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_mode1_2352_chunk(&disc, &sampler, &random, i)
+                    render_sectors(&mut writer, start_sector, end_sector, |i, out|
+                        cd::generate_mode1_2352_chunk(&disc, &sampler, &random, i, out)
                     )?;
                 }
                 CdFormat::Mode1_2048 => {
-                    render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_mode1_2048_chunk(&disc, &sampler, &random, i)
+                    render_sectors(&mut writer, start_sector, end_sector, |i, out|
+                        cd::generate_mode1_2048_chunk(&disc, &sampler, &random, i, out)
                     )?;
                 }
                 CdFormat::Mode2_2336 => {
-                    render_sectors(&mut writer, start_sector, end_sector, |i|
-                        cd::generate_mode2_2336_chunk(&disc, &sampler, &random, i)
+                    render_sectors(&mut writer, start_sector, end_sector, |i, out|
+                        cd::generate_mode2_2336_chunk(&disc, &sampler, &random, i, out)
                     )?;
                 }
             }
@@ -421,8 +423,8 @@ pub fn common_render_command<S: PatternSampler>(
                 eprintln!("[WARN] '--format {fmt:?}' is ignored because the loaded profile is for a DVD.");
             }
 
-            render_sectors(&mut writer, start_sector, end_sector, |i|
-                dvd::generate_sector(&disc, &sampler, &random, i)
+            render_sectors(&mut writer, start_sector, end_sector, |i, out|
+                dvd::generate_sector(&disc, &sampler, &random, i, out)
             )?;
         },
     }
@@ -434,29 +436,79 @@ fn render_sectors<W, F, const N: usize>(
     writer: &mut W,
     start_sector: u64,
     end_sector: u64,
-    mut generate: F,
+    generate: F,
 ) -> anyhow::Result<()>
 where
     W: Write,
-    F: FnMut(usize) -> [u8; N],
+    F: Fn(usize, &mut [u8; N]) + Sync,
 {
-    let bar = ProgressBar::new((end_sector - start_sector) * N as u64);
+    let total_sectors = end_sector - start_sector;
+    let bar = ProgressBar::new(total_sectors * N as u64);
 
     bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}, ETA: {eta:>3}")
         .expect("Invalid progress bar template")
         .progress_chars("#>.")
     );
 
-    for sector in start_sector..end_sector {
-        let chunk = generate(sector as usize);
-        // let chunk = cd::generate_mode2_2336_chunk(&disc, &picture, &mut rng, sector);
-        writer.write_all(&chunk)
-            .context("Failed to write sector data to output stream")?;
-        bar.inc(N as u64);
-    }
-    
-    writer.flush()
-        .context("Failed to flush buffer to output data")?;
+    const BATCH_SECTORS: usize = 1024;
+    const PIPELINE_DEPTH: usize = 3;
+
+    let io_result = std::thread::scope(|s| -> anyhow::Result<()> {
+        
+        let (free_tx, free_rx) = mpsc::channel::<Vec<[u8; N]>>();
+        let (ready_tx, ready_rx) = mpsc::channel::<(usize, Vec<[u8; N]>)>();
+
+        for _ in 0..PIPELINE_DEPTH {
+            free_tx
+                .send(vec![[0u8; N]; BATCH_SECTORS])
+                .expect("Failed to initialize buffer pool")
+        }
+
+        let generate = &generate;
+        s.spawn(move || {
+            let mut current = start_sector;
+            while current < end_sector {
+                let Ok(mut buf) = free_rx.recv() else {
+                    break;
+                };
+
+                let batch_len = ((end_sector - current) as usize).min(BATCH_SECTORS);
+
+                buf[..batch_len]
+                    .par_iter_mut()
+                    .enumerate()
+                    .with_min_len(8)
+                    .for_each(|(offset, sector_buf)| {
+                        generate(current as usize + offset, sector_buf)
+                    });
+
+                if ready_tx.send((batch_len, buf)).is_err() {
+                    break;
+                }
+
+                current += batch_len as u64;
+            }
+        });
+
+        let mut write_res = Ok(());
+        while let Ok((batch_len, buf)) = ready_rx.recv() {
+            if let Err(e) = writer.write_all(buf[..batch_len].as_flattened()) {
+                write_res = Err(e).context("Failed to write sector data to output stream");
+                break;
+            }
+            bar.inc((batch_len * N) as u64);
+            // Reuse buf, send to free immediately
+            let _ = free_tx.send(buf);
+        }
+
+        drop(ready_rx);
+        drop(free_tx);
+
+        write_res
+    });
+
+    io_result?;
+    writer.flush().context("Failed to flush buffer to output stream")?;
     bar.finish();
 
     Ok(())

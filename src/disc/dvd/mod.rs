@@ -5,9 +5,7 @@ use efmplus::{EFMPlusStateMachine, EFMPlusStrategy};
 use scramble::SCRAMBLE_LUT;
 
 use crate::disc::pattern::Pattern;
-use crate::picture::DiscPicture;
 use crate::geometry::{CorrectedSpiralGeometry, PolarCoord};
-use crate::dither::{Dither};
 use crate::profile::{DiscType, ProfileError};
 use crate::random::Random;
 use crate::sampler::PatternSampler;
@@ -169,7 +167,8 @@ pub fn generate_sector<S: PatternSampler>(
     sampler: &S,
     random: &Random,
     sector_num: usize,
-) -> [u8; MAIN_DATA_SIZE] {
+    out: &mut [u8; MAIN_DATA_SIZE]
+) {
 
     // Set EFM Plus state machine by 12 bytes
     let mut state = EFMPlusStateMachine::new();
@@ -199,8 +198,6 @@ pub fn generate_sector<S: PatternSampler>(
     for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
 
     let scramble_table = &SCRAMBLE_LUT[((psn >> 4) & 0x0F) as usize];
-    // Start byte sampling
-    let mut chunk = [0u8; MAIN_DATA_SIZE];
 
     /*
         First Row is | SYNC 2 | SECTOR INFO + IED + CPR_MAI 12 | 79 | SYNC 2 | 81 | PI/PO 10 |
@@ -243,113 +240,10 @@ pub fn generate_sector<S: PatternSampler>(
                     v => EFMPlusStrategy::choose(state.state(), v.base_period_at(sub_idx))
                 };
                 state.next(next_byte);
-                chunk[i] = next_byte ^ scramble_table[i];
+                out[i] = next_byte ^ scramble_table[i];
                 i += 1;
             }
             rem -= block_len;
         }
     }
-    
-    chunk
-}
-
-pub fn generate_sector_bytewise(
-    disc: &DvdDisc,
-    picture: &DiscPicture,
-    dither: &Dither,
-    random: &Random,
-    light: Pattern,
-    dark: Pattern,
-    sector_num: usize,
-) -> [u8; MAIN_DATA_SIZE] {
-
-    // Set EFM Plus state machine by 12 bytes
-    let mut state = EFMPlusStateMachine::new();
-
-    // Sector ID
-    state.next(disc.disc_type().default_sector_id_info_byte());
-    let psn: u64 = sector_num as u64 + 0x30000;
-    state.next(((psn >> 16) & 0xFF) as u8);
-    state.next(((psn >> 8) & 0xFF) as u8);
-    state.next((psn & 0xFF) as u8);
-
-    /*
-        TODO: Finish IED Calculation
-        Without IED calculation, the EFM Plus state can not be predicted correctly for first recording frame.
-
-        But all bytes are selected for returning to state 1.
-        The current EFM Plus strategy guarantees that we sync back to state 1
-        in at most 2 controlable bytes. Which is first 2 bytes in main data.
-
-        So I just set IED to 0x00. That's fine, state machine will recover in
-        2 bytes anyway.
-    */
-
-    state.next(0x00);
-    state.next(0x00);
-    // CPR_MAI
-    for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
-
-    // Initialize image luma sampling first
-    // const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
-    // const IMAGE_SAMPLES_LEN: usize = PHYSICAL_SECTOR_CHANNEL_WORDS as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
-    // assert_eq!(PHYSICAL_SECTOR_CHANNEL_WORDS as usize % CHANNEL_WORDS_PER_IMAGE_SAMPLE, 0);
-    // 2418 = 2 x 3 x 13 x 31, take one sample per 6 channel words
-
-    // Maximum channel_word for controllable region is on Row 12 end, which also contains EDC and PI/PO...
-    // | SYNC 2 | DATA 91 | SYNC 2 | DATA 77 | EDC 4 | PI/PO 10 |
-    // Here we only omit end 12 words to make it divisible to 6;
-    
-    const CHANNEL_WORDS_PER_IMAGE_SAMPLE: usize = 6;
-    const IMAGE_SAMPLES_LEN: usize = (SYNC_FRAME_CHANNEL_WORDS as usize * 24 - 12) / CHANNEL_WORDS_PER_IMAGE_SAMPLE;
-
-    let mut image_samples = [0u8; IMAGE_SAMPLES_LEN];
-
-    for i in 0..IMAGE_SAMPLES_LEN {
-        let mid_word =
-            i * CHANNEL_WORDS_PER_IMAGE_SAMPLE
-            + (CHANNEL_WORDS_PER_IMAGE_SAMPLE / 2);
-        let abs_pos = 
-            sector_num as u64
-            * PHYSICAL_SECTOR_CHANNEL_WORDS as u64
-            + mid_word as u64;
-        
-        let coord = disc.channel_word_to_polar_coord(abs_pos);
-        let luma = picture.sample_polar(coord);
-        image_samples[i] = luma;
-    }
-    let image_samples = image_samples;
-
-    let scramble_table = &SCRAMBLE_LUT[((psn >> 4) & 0x0F) as usize];
-    // Start byte sampling
-    let mut chunk = [0u8; MAIN_DATA_SIZE];
-
-    for i in 0..MAIN_DATA_SIZE {
-        let channel_word = main_to_channel_word_index(i as u64);
-        // Frame head reset event, immediately after 2 word sync
-        // Each sync immediately follows main data section except first sync
-        if channel_word % 93 == 2 {
-            state.reset();
-        }
-
-        let abs_address = sector_num as u64 * MAIN_DATA_SIZE as u64 + i as u64;
-        let luma = image_samples[channel_word as usize / CHANNEL_WORDS_PER_IMAGE_SAMPLE];
-        let pattern = if dither.dither(luma, abs_address) {
-            light
-        } else {
-            dark
-        };
-
-        let next_byte = match pattern {
-            Pattern::Random => {
-                random.sample(abs_address, scramble_table[i])
-            },
-            v => EFMPlusStrategy::choose(state.state(), v.base_period_at(0))
-        };
-        
-        state.next(next_byte);
-        chunk[i] = next_byte ^ scramble_table[i]
-    }
-
-    chunk
 }
