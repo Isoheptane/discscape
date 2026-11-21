@@ -12,7 +12,9 @@
         "media": {
             "brand": "Verbatim",
             "description": "Verbatim Digital Vinyl Gold AZO CD-R 52x",
-            "rated_speed": "52x"
+            "rated_speed": "52x",
+            "mid": "97m34s23f",
+            "stamper_code": "ZE6778-CDR-A80A AZO"
         },
         "recording": {
             "drive": "HP DVD A DS8ACSH",
@@ -20,6 +22,7 @@
             "speed_x": 16,
             "software": "cdrdao",
             "date": null
-        }
+        },
+        "contributors": ["Cascade Kobayashi"]
     }
 }

@@ -53,21 +53,23 @@
     "metadata": {
         "media": {
             "brand": "Verbatim",
-            "description": "Verbatim DVD+RW 4x",
+            "description": "Verbatim DVD+RW (SERL) 4x",
             "rated_speed": "4x",
-            "mid": "MKM/A02"
+            "mid": "MKM/A02",
+            "stamper_code": "CC5410-DVRW-Q47H"
         },
         "recording": {
             "drive": "HP DVD A DS8ACSH",
             "firmware": "LHS3",
             "speed_x": 3,
-            "software": "growisofs",
+            "software": "growisofs -dvd-compat",
             "date": "2026-11-05"
         },
         "notes": [
             "Geometry and phase correction: Calibrated",
             "Verified on 2 discs of the same model (same drive)",
             "Radius scaling: Not calibrated"
-        ]
+        ],
+        "contributors": ["Cascade Kobayashi"]
     }
 }

@@ -27,7 +27,8 @@
         "media": {
             "brand": "Mitsubishi",
             "description": "Mitsubishi SERL CD-RW 4-12x",
-            "rated_speed": "4-12x"
+            "rated_speed": "4-12x",
+            "mid": "97m34s23f"
         },
         "recording": {
             "drive": "HP DVD A DS8ACSH",

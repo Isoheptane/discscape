@@ -101,6 +101,9 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
             if let Some(Value::String(v)) = media.get("rated_speed") {
                 println!("  Rated Speed:        {v}")
             }
+            if let Some(Value::String(v)) = media.get("stamper_code") {
+                println!("  Stamper Code:       {v}")
+            }
             println!();
         }
 
@@ -132,6 +135,24 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
                 }
                 Value::String(s) => {
                     println!("Notes");
+                    println!("  {s}");
+                    println!();
+                }
+                _ => {}
+            };
+        }
+
+        if let Some(notes) = metadata.get("contributors") {
+            match notes {
+                Value::Array(array) => {
+                    println!("Contributors");
+                    for line in array.iter().filter_map(|v| v.as_str()) {
+                        println!("  - {line}");
+                    }
+                    println!();
+                }
+                Value::String(s) => {
+                    println!("Contributors");
                     println!("  {s}");
                     println!();
                 }

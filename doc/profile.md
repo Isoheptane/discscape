@@ -64,6 +64,7 @@ A disc profile is a JSON document describing the recording medium, spiral geomet
   - `description`
   - `rated_speed`
   - `mid`
+  - `stamper_code`
 - `metadata.recording`
   - `drive`
   - `firmware`
@@ -71,3 +72,4 @@ A disc profile is a JSON document describing the recording medium, spiral geomet
   - `software`
   - `date`
 - `metadata.notes`
+- `metadata.contributors`
