@@ -174,17 +174,21 @@ pub fn generate_sector<S: PatternSampler>(
     let mut state = EFMPlusStateMachine::new();
 
     // Sector ID
-    state.next(disc.disc_type().default_sector_id_info_byte());
+    // state.next(disc.disc_type().default_sector_id_info_byte());
     let psn: u64 = sector_num as u64 + 0x30000;
-    state.next(((psn >> 16) & 0xFF) as u8);
-    state.next(((psn >> 8) & 0xFF) as u8);
-    state.next((psn & 0xFF) as u8);
+    // state.next(((psn >> 16) & 0xFF) as u8);
+    // state.next(((psn >> 8) & 0xFF) as u8);
+    // state.next((psn & 0xFF) as u8);
 
     /*
         TODO: Finish IED Calculation
-        Without IED calculation, the EFM Plus state can not be predicted correctly for first recording frame.
+        Without IED calculation, the EFM Plus state can not be predicted correctly
+        for first recording frame.
 
-        But all bytes are selected for returning to state 1.
+        But we can not accurately predict it because of DSV control (Substitution
+        table and State 1/4 switch).
+
+        And all bytes are selected for returning to state 1.
         The current EFM Plus strategy guarantees that we sync back to state 1
         in at most 2 controlable bytes. Which is first 2 bytes in main data.
 
@@ -192,10 +196,10 @@ pub fn generate_sector<S: PatternSampler>(
         2 bytes anyway.
     */
 
-    state.next(0x00);
-    state.next(0x00);
+    // state.next(0x00);
+    // state.next(0x00);
     // CPR_MAI
-    for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
+    // for _ in 0..CPR_MAI_SIZE { state.next(0x00) }
 
     let scramble_table = &SCRAMBLE_LUT[((psn >> 4) & 0x0F) as usize];
 

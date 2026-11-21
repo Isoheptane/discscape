@@ -152,7 +152,7 @@ pub fn render_multiplex_command(args: RenderMultiplexArgs) -> anyhow::Result<()>
     }
 
     // Allow seed later
-    let sampler = MultiplexSampler::new(pats, args.dump.into(), args.dither_seed);
+    let sampler = MultiplexSampler::new(pats, args.dump.into(), args.dither_seed, common.gamma);
 
     common_render_command(common, sampler)
 }

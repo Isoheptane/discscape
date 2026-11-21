@@ -264,7 +264,7 @@ fn fill_sector_region<S: PatternSampler>(
         let pattern = sampler.sample(coord, dither_addr);
 
         let scramble = if scrambled {
-            SCRAMBLE_TABLE[SECTOR_SIZE_BYTES + idx - 12]
+            SCRAMBLE_TABLE[idx + sector_offset_base - 12]
         } else  {
             0x00   
         };
@@ -324,5 +324,5 @@ pub fn generate_mode2_2336_chunk<S: PatternSampler>(
     sector_num: usize,
     chunk: &mut [u8; MODE2_2336_CHUNK_SIZE],
 ) {
-    fill_sector_region(disc, sampler, random, sector_num, &mut chunk[16..], 16, true, true);
+    fill_sector_region(disc, sampler, random, sector_num, chunk, 16, true, true);
 }

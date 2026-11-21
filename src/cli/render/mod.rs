@@ -115,12 +115,10 @@ impl From<PatternArg> for Pattern {
 */
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DitherArg {
-    Gate { threshold: u8 },
     SplitMix64 { seed: u64 }
 }
 
 impl DitherArg {
-    pub const DEFAULT_THRESHOLD: u8 = 128;
     pub const DEFAULT_SEED: u64 = 0x114514;
 }
 
@@ -135,7 +133,6 @@ impl Default for DitherArg {
 impl fmt::Display for DitherArg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Gate { threshold } => write!(f, "gate:{threshold}"),
             Self::SplitMix64 { seed } => write!(f, "splitmix64:0x{seed:x}"),
         }
     }
@@ -151,18 +148,6 @@ impl FromStr for DitherArg {
         };
 
         match kind.to_ascii_lowercase().as_str() {
-            "gate" => {
-                let threshold = match param {
-                    Some(p) => p.parse::<u8>().map_err(|source| 
-                        ParseDitherArgError::InvalidThreshold {
-                            value: p.to_string(),
-                            source
-                        }
-                    )?,
-                    None => Self::DEFAULT_THRESHOLD
-                };
-                Ok(Self::Gate { threshold })
-            }
             "splitmix64" => {
                 let seed = match param {
                     Some(p) => {
@@ -188,8 +173,7 @@ impl FromStr for DitherArg {
 impl From<DitherArg> for Dither {
     fn from(value: DitherArg) -> Self {
         match value {
-            DitherArg::Gate { threshold } => Self::gate(threshold),
-            DitherArg::SplitMix64 { seed } => Self::splitmix64(seed),
+            DitherArg::SplitMix64 { seed } => Self::new(seed),
         }
     }
 }
@@ -342,6 +326,15 @@ pub struct CommonRenderArgs {
         help_heading = "Rendering Options"
     )]
     pub random: RandomArg,
+
+    /// Gamma correction exponent applied to input image luminance
+    #[arg(
+        long,
+        value_name = "GAMMA",
+        default_value_t = 2.2,
+        help_heading = "Rendering Options"
+    )]
+    pub gamma: f64
 }
 
 #[derive(Debug, thiserror::Error)]

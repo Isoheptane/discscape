@@ -70,12 +70,7 @@ pub fn render_grayscale_command(args: RenderGrayscaleArgs) -> anyhow::Result<()>
         .with_context(|| format!("Failed to decode image file'{}'", args.image.display()))?;
     let picture = DiscPicture::new(image.grayscale());
 
-    let sampler = GrayscaleSampler {
-        picture: picture.clone(),
-        dither,
-        light,
-        dark,
-    };
+    let sampler = GrayscaleSampler::new(picture, dither, light, dark, common.gamma);
 
     common_render_command(common, sampler)
 }

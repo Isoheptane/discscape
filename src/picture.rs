@@ -38,10 +38,9 @@ impl DiscPicture {
         let x = x.clamp(0, self.width as i32 - 1) as u32;
         let y = y.clamp(0, self.height as i32 - 1) as u32;
         
-        let luma = self.image.get_pixel(x, y).0[0] as u32;
+        let luma = self.image.get_pixel(x, y).0[0];
 
-        // TODO: Change gamma correction to elsewhere
-        ((luma * luma) / 255) as u8
+        luma
     }
 
     #[inline]
