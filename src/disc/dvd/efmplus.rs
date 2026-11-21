@@ -118,21 +118,28 @@ impl EFMPlusStateMachine {
 
 /*
     State 1 Bytes:
-    - 0x5F: 0000001000000010 -> State 1 (8-8)
-    - 0xB0: 0001000010000010 -> State 1 (5-5-6)
-    - 0x66: 0010001000100010 -> State 1 (4-4-4-4)
-    - 0x62: 0010010010010010 -> State 1 (3-3-3-3-4)
+    - 0x60: 0000000100000001 (All State 1) (8-8)
+    - 0xF9: 0000100001000001 (All State 1) (5-5-6)
+    - 0x6F: 0001000100010001 (All State 1) (4-4-4-4)
+    - 0xA5: 0010010010010001 (1,2->1, 3,4->2) (3-3-3-3-4)
 
-    State 2 (Trivial)
-
-    State 3:
-    - 0x64: 1000010001000010 -> State 1 (5-4-5-)
-    - 0xB0: 1000001000001001 -> State 1 (6-6-3-)
+    State 2 Bytes:
+    - 0xF9: 0000100001000001 (All State 1) (8-8)
+    - 0xF9: 0000100001000001 (All State 1) (5-5-6)
+    - 0x6F: 0001000100010001 (All State 1) (4-4-4-4)
+    - 0xA5: 0010010010010001 (1,2->1, 3,4->2) (3-3-3-3-4)
     
-    State 4:
-    - 0x76: 0100010001000001 -> State 1 (-4-4-6-)
-    - 0xB0: 1000001000001001 -> State 1 (6-6-3-)
-
+    State 3 Bytes:
+    - 0xFB: 1000000100000001 (All State 1) (7-8)
+    - 0xF9: 1000010000001001 (All State 1) (5-7-3)
+    - 0x6F: 0100000010001001 (All State 1) (X)
+    - 0xB1: 0001001001001001 (All State 1) (4-3-3-3-3)
+    
+    State 4 Bytes:
+    - 0xFB: 1000000100000001 (All State 1) (7-8)
+    - 0xF9: 1000010000001001 (All State 1) (5-7-3)
+    - 0x6F: 0100000010001001 (All State 1) (X)
+    - 0xEB: 0100100100010001 (All State 1) (2-3-3-4-4)
 */
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -140,10 +147,10 @@ pub struct EFMPlusStrategy;
 
 impl EFMPlusStrategy {
     const TRANSITION_STRATEGY: [[u8; 4]; 4] = [
-        [0x62, 0x66, 0xB0, 0x5F],
-        [0x62, 0x66, 0xB0, 0x40],
-        [0x70, 0x64, 0xB0, 0xB2],
-        [0x70, 0x76, 0xB0, 0xB2],
+        [0xA5, 0x6F, 0xF9, 0x60],
+        [0xA5, 0x6F, 0xF9, 0xF9],
+        [0xB1, 0x6F, 0xF9, 0xFB],
+        [0xEB, 0x6F, 0xF9, 0xFB],
     ];
 
     #[inline]
