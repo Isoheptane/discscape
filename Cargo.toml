@@ -3,7 +3,7 @@ name = "discscape"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "Renders image into visible patterns on the data side of a CD"
+description = "Renders image into visible patterns on the data side of a optical discs"
 license = "MIT"
 authors = ["Isoheptane"]
 

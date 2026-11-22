@@ -1,0 +1,13 @@
+{
+  "disc": {
+    "type": "DVD+RW",
+    "capacity_sectors": 2295104
+  },
+  "geometry": {
+    "r0_mm": 24.0,
+    "pitch_um": 0.7406477102138135,
+    "n": 45961.25586730827
+  },
+  "correction": null,
+  "metadata": null
+}

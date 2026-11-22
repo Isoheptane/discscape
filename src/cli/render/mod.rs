@@ -180,7 +180,7 @@ impl From<DitherArg> for Dither {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseDitherArgError {
-    #[error("Unknown dither algorithm '{kind}'. Expected 'gate[:0..=255]' or 'splitmix64[:seed]'")]
+    #[error("Unknown dither algorithm '{kind}'. Expected 'splitmix64[:seed]'")]
     UnknownKind { kind: String },
 
     #[error("Invalid gate threshold '{value}': expected an integer in 0..=255 ({source})")]

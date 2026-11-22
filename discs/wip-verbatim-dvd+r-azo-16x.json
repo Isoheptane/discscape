@@ -12,15 +12,11 @@
         "media": {
             "brand": "Verbatim",
             "description": "Verbatim DVD+R AZO 16x Verbatim#43498",
-            "rated_speed": "16x",
             "mid": "MCC/004",
             "stamper_code": "ZE6369-DVR-T47D"
         },
         "recording": {
             "drive": "HP DVD A DS8ACSH",
-            "firmware": "LHS3",
-            "speed_x": 6,
-            "software": "growisofs",
             "date": "2026-11-03"
         },
         "contributors": ["Cascade Kobayashi"]

@@ -39,7 +39,7 @@ pub struct RenderGrayscaleArgs {
     )]
     pub dark: PatternArg,
 
-    /// Dithering algorithm: 'gate[:0..=255]' or 'splitmix64[:seed]'
+    /// Dithering algorithm: 'splitmix64[:seed]'
     #[arg(
         long,
         default_value_t,
