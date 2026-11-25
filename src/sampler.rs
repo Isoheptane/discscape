@@ -74,9 +74,10 @@ impl MultiplexSampler {
         dump: Pattern,
         seed: u64,
         gamma: f64,
+        norm: bool,
     ) -> Self {
         let sum: f64 = channels.iter().map(|(_, _, w)| w).sum();
-        let norm_factor = if sum > 1.0 { 1.0 / sum } else { 1.0 };
+        let norm_factor = if norm && sum > 1.0 { 1.0 / sum } else { 1.0 };
 
         let channels: Vec<MultiplexChannel> = channels.into_iter().map(|(pattern, picture, w)| {
             let normalized_w = w * norm_factor;
@@ -96,16 +97,36 @@ impl MultiplexSampler {
 impl PatternSampler for MultiplexSampler {
     #[inline]
     fn sample(&self, coord: PolarCoord, addr: u64) -> Pattern {
-        let hash = (splitmix64_hash(addr ^ self.seed) >> 32) as u32;
-
+        let len = self.channels.len();
         let planar = polar_to_cartesian(coord);
 
-        let mut sum: u32 = 0;
-        for ch in &self.channels {
+        const STACK_CAP: usize = 32;
+        let mut stack_buf = [0u32; STACK_CAP];
+        let mut heap_buf = Vec::<u32>::new();
+        let weights = if self.channels.len() <= STACK_CAP {
+            &mut stack_buf[..len]
+        } else {
+            heap_buf.resize(len, 0);
+            heap_buf.as_mut_slice()
+        };
+
+        let mut weight_sum: u64 = 0;
+        for (slot, ch) in weights.iter_mut().zip(&self.channels) {
             let luma = ch.picture.sample_cartesian(planar);
-            sum = sum.saturating_add(ch.gamma_lut[luma as usize]);
-            if hash < sum {
-                return ch.pattern
+            let weight = ch.gamma_lut[luma as usize];
+            weight_sum += weight as u64;
+            *slot = weight
+        }
+
+        let range = weight_sum.max(u32::MAX as u64);
+        let hash = splitmix64_hash(addr ^ self.seed);
+        let target = ((hash as u128 * range as u128) >> 64) as u64;
+
+        let mut sum: u64 = 0;
+        for (ch, &w) in self.channels.iter().zip(weights.iter()) {
+            sum = sum + w as u64;
+            if target < sum {
+                return ch.pattern;
             }
         }
 
@@ -117,6 +138,9 @@ impl PatternSampler for MultiplexSampler {
             if ch.pattern == Pattern::Random {
                 return true;
             }
+        }
+        if self.dump == Pattern::Random {
+            return true;
         }
         false
     }

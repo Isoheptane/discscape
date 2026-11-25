@@ -19,13 +19,13 @@ pub struct ChannelArg {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseChannelArgError {
-    #[error("Invalid channel spec '{spec}': expected '<pattern>:<image_path>[:<weight>]'")]
+    #[error("Invalid channel spec '{spec}': expected '<image_path>:<pattern>[:<weight>]'")]
     InvalidFormat { spec: String },
 
     #[error("Unknown pattern '{pattern}' in channel spec: {message}")]
     UnknownPattern { pattern: String, message: String },
 
-    #[error("Invalid channel weight '{weight}': must be a finite number in 0.0..=1.0")]
+    #[error("Invalid channel weight '{weight}': must be a positive number")]
     InvalidWeight {
         weight: String,
         #[source]
@@ -112,6 +112,7 @@ pub struct RenderMultiplexArgs {
     )]
     pub dump: PatternArg,
 
+    /// Dithering algorithm seed (splitmix64)
     #[arg(
         long,
         default_value_t = 0x114514,
@@ -120,6 +121,13 @@ pub struct RenderMultiplexArgs {
         value_parser = hex_parser
     )]
     pub dither_seed: u64,
+
+    /// Disable weight normalization
+    #[arg(
+        long,
+        help_heading = "Multiplexing Options"
+    )]
+    pub no_global_norm: bool,
 }
 
 fn hex_parser(s: &str) -> Result<u64, String> {
@@ -140,6 +148,17 @@ pub fn render_multiplex_command(args: RenderMultiplexArgs) -> anyhow::Result<()>
     let mut pats: Vec<(Pattern, DiscPicture, f64)> = vec![];
 
     for channel in args.channels {
+        let weight = channel.weight.unwrap_or(1.0);
+
+        if args.no_global_norm && weight > 1.0 {
+            anyhow::bail!(
+                "Channel '{}' weight ({}) cannot exceed 1.0 when --no-global-norm is set",
+                channel.image.display(),
+                weight
+            )
+        }
+
+
         let image = ImageReader::open(&channel.image)
             .with_context(|| format!("Failed to open image file '{}'", channel.image.display()))?
             .decode()
@@ -148,11 +167,10 @@ pub fn render_multiplex_command(args: RenderMultiplexArgs) -> anyhow::Result<()>
 
         let pattern: Pattern = channel.pattern.into();
 
-        pats.push((pattern, picture, channel.weight.unwrap_or(1.0)));
+        pats.push((pattern, picture, weight));
     }
 
-    // Allow seed later
-    let sampler = MultiplexSampler::new(pats, args.dump.into(), args.dither_seed, common.gamma);
+    let sampler = MultiplexSampler::new(pats, args.dump.into(), args.dither_seed, common.gamma, !args.no_global_norm);
 
     common_render_command(common, sampler)
 }
