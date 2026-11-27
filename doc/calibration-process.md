@@ -45,7 +45,7 @@ Here, we adopt the default DVD geometric parameters to create the initial config
 ### Method A (Recommended: Fit $N$ and $p$ Simultaneously)
 Burn the first disc using an image with rings (such as spoke-full) together with `step0_init.json`. Even if the initial parameters cause severe spoke distortion, the radius rings usually remain clearly visible. We can estimate the cumulative number of turns of the spokes at each radial position and feed these readings into the fitting tool to compute the corrected $N$ and $p$ simultaneously, which substantially reduces the time needed to calibrate a heavily distorted $p$ later on.
 
-![](./assets/calibration-process-step0.webp)
+![](./assets/calibration-process/step0.webp)
 
 The burn result from the initial parameters in `step0_init.json ` is shown in the figure.
 
@@ -95,13 +95,36 @@ After execution, `geometry` in `step1_coarse.json` updates to the initially conv
 Then burn a new disc using `step1_coarse.json` to inspect the correction results.
 
 ### Method B (Adjust $N$ Individually)
-If the distortion is so dense that the rings interfere with reading, burn the `spoke-no-ring` image instead and directly observe the total number of turns $m$ that the spokes rotate from inside to outside. Add $m$ to $N$ for clockwise rotation, or subtract $m$ for counterclockwise rotation.   
+If the distortion is so dense that the rings interfere with reading, burn the `spoke-no-ring` image instead and directly observe the total number of turns $m$ that the spokes rotate from inside to outside. Add $m$ to $N$ for clockwise rotation, or subtract $m$ for counterclockwise rotation.
+
+### Special Case
+In practice, you may encounter cases where the spiral reverses partway through switching from clockwise winding to counterclockwise winding (or vice versa), as shown in the simulation below:
+
+![](./assets/calibration-process/simulation.webp)
+
+This occurs when the bow-shaped distortion caused by $p$ locally cancels out the unidirectional distortion caused by $N$ over a radial interval, causing the angular rotation rate of the spokes to approach zero and reverse direction. Consequently, near the reversal radius (such as around the 9 o'clock to 1 o'clock positions in the figure), the line spacing widens abruptly and overlaps into prominent thick arcs, forming U-shaped turnaround loops at the extremum; past this region, the spiral tightens back into fine, dense lines winding in the opposite direction.
+
+When this occurs, **do not use Method B (looking only at the net turn difference between the inner and outer edges)**—the opposing windings in the inner and outer halves will cancel each other out and mask the true distortion, and adjusting $N$ alone merely shifts the reversal radius without eliminating the large bow-shaped curvature. Instead, use **Method A** to fit $N$ and $p$ simultaneously, taking cumulative revolution readings at each radius as shown below:
+
+![](./assets/calibration-process/simulation-reading.webp)
+
+The figure demonstrates how to take readings moving outward from the inner ring on the right (`25` mm) to the outer ring on the left (`55` mm):
+1. **Count upward along the initial winding direction**: Starting from `+0.0` at `25` mm, the spiral initially winds clockwise, accumulating to `+5.5` at `30` mm (between `5` and `6`).
+2. **Switch to counting downward past the reversal zone**: Within the thick-band / blank reversal zone between `30` and `35` mm, the spiral goes slightly past `+6` turns and reverses direction. There is no need to force an exact count inside the reversal zone itself—simply identify that the first clear integer line just outside it is still `6`, after which the values decrease in the counterclockwise direction:
+   - Approximately `+5.9` at `35` mm
+   - Decreasing to approximately `+2.9` at `40` mm
+3. **Cross `0` and continue recording negative values**: Continuing outward, the count passes back through `0` and enters negative values:
+   - Approximately `-2.2` at `45` mm
+   - Approximately `-9.0` at `50` mm
+   - Approximately `-16.6` at `55` mm
+
+Once this "rise-then-fall" set of readings is fed into `discscape profile fit`, the fitting tool can directly converge to the correct $N$ and $p$.
 
 ### Criteria for Entering the Next Stage
 Once the overall number of twisted turns is sufficiently small (for example, less than 1–2 turns), or a distinct "bow-shaped" distortion begins to appear within the twist, $N$ is no longer the dominant component of the error, and you can proceed to the fine tuning stage.
 
 ## 3. Fine Tuning Stage
-**Images used**: `spoke-thin-ring` 或 `spoke-full`
+**Images used**: `spoke-thin-ring` or `spoke-full`
 
 Burn the image using the coarse-tuned profile. At this stage, the spokes no longer wind severely, though they typically carry a noticeable "bow-shaped" curvature. Starting from the innermost root, count and record how many cumulative turns (including decimals) or degrees of angular offset the spokes have rotated at each radius ring (reading only at 5 mm steps is needed); if the inner root is blurry and unreadable, choose a clearly visible radius $r_z$ (set as `ref_radius`) as the reference and record how many turns or degrees the other radii rotate relative to that reference.
 
