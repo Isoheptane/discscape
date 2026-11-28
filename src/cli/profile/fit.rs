@@ -56,7 +56,7 @@ pub fn profile_fit_command(args: ProfileFitArgs) -> anyhow::Result<()> {
     let measure_content = std::fs::read_to_string(&args.measure)
         .with_context(|| format!("Failed to read measure file at '{}'", args.measure))?;
     let measure: MeasurementDoc = serde_json::from_str(&measure_content)
-        .with_context(|| format!("Failed to parse JSON in profile '{}'", args.measure))?;
+        .with_context(|| format!("Failed to parse JSON in measure '{}'", args.measure))?;
 
     let has_existing_correction = profile.correction.is_some();
     if has_existing_correction && args.bake && !args.replace_correction && !args.accumulate_correction {

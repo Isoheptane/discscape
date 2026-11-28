@@ -74,11 +74,11 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
             println!("  Step:               {:.3} mm", lut.step);
 
             let min = lut.lut.iter()
-                .map(|p| *p)
+                .copied()
                 .fold(f64::INFINITY, f64::min);
 
             let max = lut.lut.iter()
-                .map(|p| *p)
+                .copied()
                 .fold(f64::NEG_INFINITY, f64::max);
 
             println!("  Value Range:        {:+.6} rev ~ {:+.6} rev", min, max);
@@ -142,8 +142,8 @@ pub fn profile_show_command(args: ProfileShowArgs) -> anyhow::Result<()> {
             };
         }
 
-        if let Some(notes) = metadata.get("contributors") {
-            match notes {
+        if let Some(contributors) = metadata.get("contributors") {
+            match contributors {
                 Value::Array(array) => {
                     println!("Contributors");
                     for line in array.iter().filter_map(|v| v.as_str()) {
